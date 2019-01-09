@@ -5,7 +5,7 @@ const engine = new BABYLON.Engine(canvas, true);
 BABYLON.Animation.AllowMatricesInterpolation = true;
 
 const scene = new BABYLON.Scene(engine);
-scene.debugLayer.show();
+//scene.debugLayer.show();
 scene.clearColor = new BABYLON.Color3(1, 1, 1);
 
 const camera = new BABYLON.ArcRotateCamera("Camera", 1, 1, 4, new BABYLON.Vector3(-10, 10, 20), scene);
@@ -48,7 +48,122 @@ const dummy = BABYLON.MeshBuilder.CreateBox("box", {}, scene);
 dummy.position.y = 1;
 dummy.material = new BABYLON.StandardMaterial("standardmaterial", scene);
 
-let player;
+let player = {};
+let player_list = [];
+let orb_list = [];
+let session_started = false;
+
+// configure WebSocket client
+
+const websocket = new WebSocket(((window.location.protocol === 'https:') ? 'wss://' : 'ws://') + window.location.host);
+websocket.binaryType = 'arraybuffer';
+
+websocket.onmessage = (event) => {
+    if (typeof event.data === 'string') {
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'welcome') {
+            player.id = data.id;
+            data.player_list.forEach(player => {
+                const mesh = BABYLON.MeshBuilder.CreateBox("box", {}, scene);
+                mesh.position.y = 1;
+                mesh.material = new BABYLON.StandardMaterial("standardmaterial", scene);
+                player_list.push({ id: player.id, x: player.x, y: player.y, mesh: mesh, units: [] });
+            });
+
+            const player_object = player_list.find(player_object => player_object.id === player.id);
+            player.x = player_object.x;
+            player.y = player_object.y;
+            player.mesh = player_object.mesh;
+            camera.target = player.mesh;
+
+            session_started = true;
+        }
+
+        if (data.type === 'new_player' && session_started) {
+            const mesh = BABYLON.MeshBuilder.CreateBox("box", {}, scene);
+            mesh.position.y = 1;
+            mesh.material = new BABYLON.StandardMaterial("standardmaterial", scene);
+            player_list.push({ id: data.id, x: data.x, y: data.y, mesh: mesh, units: [] });
+        }
+
+        if (data.type === 'player_disconnect') {
+            const player_object = player_list.find(player_object => player_object.id === data.id);
+            player_object.mesh.dispose();
+            player_list.splice(player_list.indexOf(player_object), 1);
+        }
+
+    }
+
+    if (event.data instanceof ArrayBuffer && session_started) {
+        const dataview = new DataView(event.data);
+
+        if (dataview.getUint8(0) === 1) { // player positions
+            for (let i = 0; i < dataview.getUint8(1); i++) {
+                const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(2 + i * 12));
+                player_object.x = dataview.getFloat32(6 + i * 12);
+                player_object.y = dataview.getFloat32(10 + i * 12);
+            }
+        }
+
+        if (dataview.getUint8(0) === 6) { // new unit of a player
+            const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(1));
+            const mesh = BABYLON.MeshBuilder.CreateBox("box", {}, scene);
+            mesh.position.y = 1;
+            mesh.material = new BABYLON.StandardMaterial("standardmaterial", scene);
+            player_object.units.push({ x: dataview.getFloat32(5), y: dataview.getFloat32(9), mesh: mesh });
+        }
+
+        if (dataview.getUint8(0) === 5) { // new orb spawning
+            orb_list.push({ x: dataview.getFloat32(1), y: dataview.getFloat32(5) });
+        }
+
+        // no player deaths for now
+
+        // no player respawns either
+
+        if (dataview.getUint8(0) === 7) { // a player's units
+            const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(2));
+            if (player_object.units) {
+                for (let i = 0; i < dataview.getUint8(1); i++) {
+                    player_object.units[i].x = dataview.getFloat32(6 + i * 4);
+                    player_object.units[i].y = dataview.getFloat32(10 + i * 4);
+                }
+            }
+        }
+    }
+}
+
+// open the WebSocket connection
+websocket.onopen = () => {
+    websocket.send(JSON.stringify({ type: 'join' }));
+};
+
+scene.registerBeforeRender(function () {
+    if (session_started) {
+        const arraybuffer = new ArrayBuffer(20);
+        const dataview = new DataView(arraybuffer);
+
+        const pickResult = scene.pick(scene.pointerX, scene.pointerY);
+
+        dataview.setUint8(0, 1);
+        dataview.setFloat32(1, player.mesh.position.x);
+        dataview.setFloat32(5, player.mesh.position.z);
+        dataview.setFloat32(9, pickResult.pickedPoint.x);
+        dataview.setFloat32(13, pickResult.pickedPoint.z);
+        websocket.send(dataview);
+
+        player_list.forEach(player_object => {
+            player_object.mesh.position.x = player_object.x;
+            player_object.mesh.position.z = player_object.y;
+            // the player's units too
+            player_object.units.forEach(unit => {
+                unit.mesh.position.x = unit.x;
+                unit.mesh.position.z = unit.y;
+            });
+        });
+    }
+});
 
 engine.runRenderLoop(function () {
     scene.render();
