@@ -68,7 +68,7 @@ websocket.onmessage = (event) => {
                 const mesh = BABYLON.MeshBuilder.CreateBox("box", {}, scene);
                 mesh.position.y = 1;
                 mesh.material = new BABYLON.StandardMaterial("standardmaterial", scene);
-                player_list.push({ id: player.id, x: player.x, y: player.y, mesh: mesh, units: [] });
+                player_list.push({ id: player.id, x: player.x, y: player.y, mesh: mesh });
             });
 
             const player_object = player_list.find(player_object => player_object.id === player.id);
@@ -84,7 +84,7 @@ websocket.onmessage = (event) => {
             const mesh = BABYLON.MeshBuilder.CreateBox("box", {}, scene);
             mesh.position.y = 1;
             mesh.material = new BABYLON.StandardMaterial("standardmaterial", scene);
-            player_list.push({ id: data.id, x: data.x, y: data.y, mesh: mesh, units: [] });
+            player_list.push({ id: data.id, x: data.x, y: data.y, mesh: mesh });
         }
 
         if (data.type === 'player_disconnect') {
@@ -106,14 +106,6 @@ websocket.onmessage = (event) => {
             }
         }
 
-        if (dataview.getUint8(0) === 6) { // new unit of a player
-            const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(1));
-            const mesh = BABYLON.MeshBuilder.CreateBox("box", {}, scene);
-            mesh.position.y = 1;
-            mesh.material = new BABYLON.StandardMaterial("standardmaterial", scene);
-            player_object.units.push({ x: dataview.getFloat32(5), y: dataview.getFloat32(9), mesh: mesh });
-        }
-
         if (dataview.getUint8(0) === 5) { // new orb spawning
             orb_list.push({ x: dataview.getFloat32(1), y: dataview.getFloat32(5) });
         }
@@ -121,16 +113,6 @@ websocket.onmessage = (event) => {
         // no player deaths for now
 
         // no player respawns either
-
-        if (dataview.getUint8(0) === 7) { // a player's units
-            const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(2));
-            if (player_object.units) {
-                for (let i = 0; i < dataview.getUint8(1); i++) {
-                    player_object.units[i].x = dataview.getFloat32(6 + i * 4);
-                    player_object.units[i].y = dataview.getFloat32(10 + i * 4);
-                }
-            }
-        }
     }
 }
 
@@ -139,28 +121,26 @@ websocket.onopen = () => {
     websocket.send(JSON.stringify({ type: 'join' }));
 };
 
+document.addEventListener('click', function () {
+    const arraybuffer = new ArrayBuffer(20);
+    const dataview = new DataView(arraybuffer);
+
+    const pickResult = scene.pick(scene.pointerX, scene.pointerY);
+
+    dataview.setUint8(0, 1);
+    dataview.setFloat32(1, pickResult.pickedPoint.z);
+    dataview.setFloat32(5, pickResult.pickedPoint.x);
+    websocket.send(dataview);
+});
+
 scene.registerBeforeRender(function () {
     if (session_started) {
         const arraybuffer = new ArrayBuffer(20);
         const dataview = new DataView(arraybuffer);
 
-        const pickResult = scene.pick(scene.pointerX, scene.pointerY);
-
-        dataview.setUint8(0, 1);
-        dataview.setFloat32(1, player.mesh.position.x);
-        dataview.setFloat32(5, player.mesh.position.z);
-        dataview.setFloat32(9, pickResult.pickedPoint.x);
-        dataview.setFloat32(13, pickResult.pickedPoint.z);
-        websocket.send(dataview);
-
         player_list.forEach(player_object => {
             player_object.mesh.position.x = player_object.x;
             player_object.mesh.position.z = player_object.y;
-            // the player's units too
-            player_object.units.forEach(unit => {
-                unit.mesh.position.x = unit.x;
-                unit.mesh.position.z = unit.y;
-            });
         });
     }
 });

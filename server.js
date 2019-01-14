@@ -57,8 +57,16 @@ ws_server.on('connection', (websocket) => {
         if (message instanceof ArrayBuffer) {
             const client_dataview = new DataView(message);
 
-            if (client_dataview.getUint8(0) === 1) { // player's movement direction
-                game.processPlayerDirection(websocket.player, client_dataview.getFloat32(1), client_dataview.getFloat32(5), client_dataview.getFloat32(9), client_dataview.getFloat32(13));
+            if (client_dataview.getUint8(0) === 1) { // player wants to move to a new position
+                const player = websocket.player;
+                // change the player's direction
+                player.direction = Math.atan2(client_dataview.getFloat32(1) - player.y, client_dataview.getFloat32(5) - player.x);
+                // change the player's target destination
+                player.targetY = client_dataview.getFloat32(1);
+                player.targetX = client_dataview.getFloat32(5);
+                // change the player's velocity
+                player.velocityX = Math.cos(player.direction) * player.movement_speed;
+                player.velocityY = Math.sin(player.direction) * player.movement_speed;
             }
         }
     });
@@ -81,7 +89,6 @@ class Game {
     constructor() {
         this.players = [];
         this.mapSize = 100; // width and height
-        this.orbs = []; // array of orbs that enable a player to have new units
     }
 
     addPlayer() {
@@ -97,34 +104,33 @@ class Game {
             y: Math.floor(Math.random() * (this.mapSize + 1)),
             movement_speed: 0.1,
             direction: 0, // direction to move in, in radians
+            velocityX: 0,
+            velocityY: 0,
+            targetX: 0, // for click to move
+            targetY: 0,
 
             // Int32Array, 4 bytes, 32-bit two's complement signed integer
             // won't be sent to the player for now
             health: 100,
 
             isAlive: true,
-            deathTime: 0,
-
-            units: [] // array of units under this player's control
+            deathTime: 0
         };
         this.players.push(player);
         return player;
     }
 
     physicsLoop() {
-        // as the players are always moving, move the players
-        // note: dead players logic must be handled and changed
-        this.players.filter(player => { return player.isAlive })
-            .forEach(player => {
+        this.players.forEach(player => {
+            const threshold = 1;
+            if (Math.abs(player.x - player.targetX) <= threshold && Math.abs(player.y - player.targetY) <= threshold) {
+                player.velocityX = 0;
+                player.velocityY = 0;
+            } else {
                 player.x += player.movement_speed * Math.cos(player.direction);
                 player.y += player.movement_speed * Math.sin(player.direction);
-
-                // move the player's units too
-                player.units.forEach(unit => {
-                    unit.x += player.movement_speed * Math.cos(player.direction);
-                    unit.y += player.movement_speed * Math.sin(player.direction);
-                });
-            });
+            }
+        });
     }
 
     gameLogicLoop() {
@@ -151,52 +157,6 @@ class Game {
                         client.send(dataview);
                 });
             });
-
-        // players collect orbs
-        this.orbs.forEach(orb => {
-            this.players.filter(player => {
-                if (player.isAlive === true) return true;
-            })
-                .forEach(player => {
-                    if (Math.sqrt(Math.pow(player.x - orb.x, 2) + Math.pow(player.y - orb.y, 2)) <= 5) {
-                        this.orbs.splice(this.orbs.indexOf(orb), 1); // remove the orb
-                        // spawn a new unit for the player
-                        const new_unit = {
-                            x: player.x + Math.floor(Math.random() * (10 + 1)),
-                            y: player.y + Math.floor(Math.random() * (10 + 1))
-                        };
-                        player.units.push(new_unit);
-                        // notify all the players of the new unit
-                        arraybuffer = new ArrayBuffer(1 + 4 + 4 + 4);
-                        dataview = new DataView(arraybuffer);
-                        dataview.setUint8(0, 6);
-                        dataview.setUint32(1, player.id);
-                        dataview.setFloat32(5, new_unit.x);
-                        dataview.setFloat32(9, new_unit.y);
-                        ws_server.clients.forEach(client => {
-                            if (client.readyState === WebSocket.OPEN)
-                                client.send(dataview);
-                        });
-                    }
-                });
-        });
-
-        // spawn new unit orbs that can give a player new units
-        const new_unit_orb = {
-            x: Math.floor(Math.random() * (this.mapSize + 1)),
-            y: Math.floor(Math.random() * (this.mapSize + 1))
-        };
-        this.orbs.push(new_unit_orb);
-        // notify all the players of the new orb
-        arraybuffer = new ArrayBuffer(1 + 4 + 4); // [message_id, x (32-bit float), y (32-bit float)]
-        dataview = new DataView(arraybuffer);
-        dataview.setUint8(0, 5);
-        dataview.setFloat32(1, new_unit_orb.x);
-        dataview.setFloat32(5, new_unit_orb.y);
-        ws_server.clients.forEach(client => {
-            if (client.readyState === WebSocket.OPEN)
-                client.send(dataview);
-        });
     }
 
     sendNetworkUpdates() {
@@ -217,35 +177,12 @@ class Game {
             if (client.readyState === WebSocket.OPEN)
                 client.send(dataview);
         });
-
-        // send the positions of the units of the players
-        this.players.forEach(player => {
-            if (player.units.length < 1)
-                return;
-            arraybuffer = new ArrayBuffer(1 + 1 + 4 + player.units.length * (4 + 4));
-            dataview = new DataView(arraybuffer);
-            dataview.setUint8(0, 7);
-            dataview.setUint8(1, player.units.length);
-            dataview.setUint32(2, player.id);
-            player.units.forEach((unit, unit_index) => {
-                dataview.setFloat32(6 + unit_index * 4, unit.x);
-                dataview.setFloat32(10 + unit_index * 4, unit.y);
-            });
-            ws_server.clients.forEach(client => {
-                if (client.readyState === WebSocket.OPEN)
-                    client.send(dataview);
-            });
-        });
-    }
-
-    processPlayerDirection(player, player_position_x, player_position_y, input_position_x, input_position_y) {
-        player.direction = Math.atan2(input_position_y - player_position_y, input_position_x, player_position_x);
     }
 }
 
 const game = new Game();
 
-setInterval(() => { // run physics loop at 60 times a second
+setInterval(() => {
     game.physicsLoop();
 }, 1000 / config.physicsTickRate);
 setInterval(() => {
