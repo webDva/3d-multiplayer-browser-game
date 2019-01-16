@@ -214,14 +214,31 @@ setInterval(() => {
     }
 }, 1000 / 20);
 
-// physics
+function lerp(start, end, time) {
+    return start * (1 - time) + end * time;
+}
+
+// client-side physics tick
+let lastUpdateTime = Date.now();
 setInterval(() => {
+    const currentTime = Date.now();
+    const deltaTime = currentTime - lastUpdateTime;
+    const lerpTime = 800;
+
     if (session_started) {
-        // player movement
-        player_list.forEach(player_object => {
-            player_object.mesh.position.z = player_object.x;
-            player_object.mesh.position.x = player_object.y;
-        });
+        if (deltaTime <= lerpTime) { // lerp
+            // player movement
+            player_list.forEach(player_object => {
+                player_object.mesh.position.z = lerp(player_object.mesh.position.z, player_object.x, deltaTime / lerpTime);
+                player_object.mesh.position.x = lerp(player_object.mesh.position.x, player_object.y, deltaTime / lerpTime);
+            });
+        } else { // don't lerp
+            // player movement
+            player_list.forEach(player_object => {
+                player_object.mesh.position.z = player_object.x;
+                player_object.mesh.position.x = player_object.y;
+            });
+        }
 
         // projectile movement
         projectile_list.forEach(projectile => {
@@ -229,6 +246,8 @@ setInterval(() => {
             projectile.mesh.position.x += projectile.movement_speed * Math.sin(projectile.direction);
         });
     }
+
+    lastUpdateTime = currentTime;
 }, 1000 / 30);
 
 // mostly for game logic

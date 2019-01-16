@@ -1,6 +1,6 @@
 {
     "PORT": 3000,
-    "networkUpdatePulseRate": 10,
+    "networkUpdatePulseRate": 20,
     "physicsTickRate": 30,
     "player": {
         "defaultMovementSpeed": 1,
