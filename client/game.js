@@ -48,9 +48,22 @@ const dummy = BABYLON.MeshBuilder.CreateBox("box", {}, scene);
 dummy.position.y = 1;
 dummy.material = new BABYLON.StandardMaterial("standardmaterial", scene);
 
-let player = {};
+const player = {
+    id: null,
+    mesh: null,
+
+    left: false,
+    up: false,
+    right: false,
+    down: false,
+
+    combat: {
+        isShooting: false,
+        direction: 0
+    }
+};
 let player_list = [];
-let orb_list = [];
+let projectile_list = [];
 let session_started = false;
 
 // configure WebSocket client
@@ -68,13 +81,15 @@ websocket.onmessage = (event) => {
                 const mesh = BABYLON.MeshBuilder.CreateBox("box", {}, scene);
                 mesh.position.y = 1;
                 mesh.material = new BABYLON.StandardMaterial("standardmaterial", scene);
+                mesh.material.emissiveColor = new BABYLON.Color4(1, 0, 0, 1);
                 player_list.push({ id: player.id, x: player.x, y: player.y, mesh: mesh });
+                mesh.position.z = player.x;
+                mesh.position.x = player.y;
             });
 
             const player_object = player_list.find(player_object => player_object.id === player.id);
-            player.x = player_object.x;
-            player.y = player_object.y;
             player.mesh = player_object.mesh;
+            player.mesh.material.emissiveColor = new BABYLON.Color4(0, 1, 0, 1);
             camera.target = player.mesh;
 
             session_started = true;
@@ -84,6 +99,7 @@ websocket.onmessage = (event) => {
             const mesh = BABYLON.MeshBuilder.CreateBox("box", {}, scene);
             mesh.position.y = 1;
             mesh.material = new BABYLON.StandardMaterial("standardmaterial", scene);
+            mesh.material.emissiveColor = new BABYLON.Color4(1, 0, 0, 1);
             player_list.push({ id: data.id, x: data.x, y: data.y, mesh: mesh });
         }
 
@@ -106,8 +122,19 @@ websocket.onmessage = (event) => {
             }
         }
 
-        if (dataview.getUint8(0) === 5) { // new orb spawning
-            orb_list.push({ x: dataview.getFloat32(1), y: dataview.getFloat32(5) });
+        if (dataview.getUint8(0) === 2) { // newly created projectile update
+            const projectile = {
+                mesh: BABYLON.MeshBuilder.CreateSphere("sphere", {}, scene),
+                direction: dataview.getFloat32(9),
+                movement_speed: dataview.getUint32(13),
+                owner: dataview.getUint32(17),
+                creation_time: Date.now()
+            };
+
+            projectile.mesh.position.y = 1;
+            projectile.mesh.position.z = dataview.getFloat32(1);
+            projectile.mesh.position.x = dataview.getFloat32(5);
+            projectile_list.push(projectile);
         }
 
         // no player deaths for now
@@ -121,28 +148,97 @@ websocket.onopen = () => {
     websocket.send(JSON.stringify({ type: 'join' }));
 };
 
+// control for movement
+document.addEventListener('keydown', event => {
+    const char = String.fromCharCode(event.keyCode);
+    switch (char) {
+        case 'W':
+            player.up = true;
+            break;
+        case 'A':
+            player.left = true;
+            break;
+        case 'S':
+            player.down = true;
+            break;
+        case 'D':
+            player.right = true;
+            break;
+    }
+});
+
+// control for shooting
 document.addEventListener('click', function () {
+    const pickResult = scene.pick(scene.pointerX, scene.pointerY);
+    player.combat.direction = Math.atan2(pickResult.pickedPoint.x - player.mesh.position.x, pickResult.pickedPoint.z - player.mesh.position.z);
+    player.combat.isShooting = true;
+});
+
+// client network update pulse
+setInterval(() => {
     const arraybuffer = new ArrayBuffer(20);
     const dataview = new DataView(arraybuffer);
 
-    const pickResult = scene.pick(scene.pointerX, scene.pointerY);
+    // player wants to move
+    if (player.left) {
+        dataview.setUint8(0, 1);
+        dataview.setUint8(1, 1);
+        websocket.send(dataview);
+        player.left = false;
+    }
+    if (player.up) {
+        dataview.setUint8(0, 1);
+        dataview.setUint8(1, 2);
+        websocket.send(dataview);
+        player.up = false;
+    }
+    if (player.right) {
+        dataview.setUint8(0, 1);
+        dataview.setUint8(1, 3);
+        websocket.send(dataview);
+        player.right = false;
+    }
+    if (player.down) {
+        dataview.setUint8(0, 1);
+        dataview.setUint8(1, 4);
+        websocket.send(dataview);
+        player.down = false;
+    }
 
-    dataview.setUint8(0, 1);
-    dataview.setFloat32(1, pickResult.pickedPoint.z);
-    dataview.setFloat32(5, pickResult.pickedPoint.x);
-    websocket.send(dataview);
-});
+    // player wants to shoot
+    if (player.combat.isShooting) {
+        dataview.setUint8(0, 2);
+        dataview.setFloat32(1, player.combat.direction);
+        websocket.send(dataview);
+        player.combat.isShooting = false;
+    }
+}, 1000 / 20);
 
-scene.registerBeforeRender(function () {
+// physics
+setInterval(() => {
     if (session_started) {
-        const arraybuffer = new ArrayBuffer(20);
-        const dataview = new DataView(arraybuffer);
-
+        // player movement
         player_list.forEach(player_object => {
-            player_object.mesh.position.x = player_object.x;
-            player_object.mesh.position.z = player_object.y;
+            player_object.mesh.position.z = player_object.x;
+            player_object.mesh.position.x = player_object.y;
+        });
+
+        // projectile movement
+        projectile_list.forEach(projectile => {
+            projectile.mesh.position.z += projectile.movement_speed * Math.cos(projectile.direction);
+            projectile.mesh.position.x += projectile.movement_speed * Math.sin(projectile.direction);
         });
     }
+}, 1000 / 30);
+
+// mostly for game logic
+scene.registerBeforeRender(function () {
+    // remove projectiles that have lived for too long
+    projectile_list.forEach(projectile => {
+        if (Date.now() - projectile.creation_time >= 3000) {
+            projectile_list.splice(projectile_list.indexOf(projectile), 1);
+        }
+    });
 });
 
 engine.runRenderLoop(function () {

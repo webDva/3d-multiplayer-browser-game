@@ -57,16 +57,50 @@ ws_server.on('connection', (websocket) => {
         if (message instanceof ArrayBuffer) {
             const client_dataview = new DataView(message);
 
-            if (client_dataview.getUint8(0) === 1) { // player wants to move to a new position
+            if (client_dataview.getUint8(0) === 1) { // player movement
+                const direction = client_dataview.getUint8(1); // direction to move in (left:1, up:2, right:3, down:4)
                 const player = websocket.player;
-                // change the player's direction
-                player.direction = Math.atan2(client_dataview.getFloat32(1) - player.y, client_dataview.getFloat32(5) - player.x);
-                // change the player's target destination
-                player.targetY = client_dataview.getFloat32(1);
-                player.targetX = client_dataview.getFloat32(5);
-                // change the player's velocity
-                player.velocityX = Math.cos(player.direction) * player.movement_speed;
-                player.velocityY = Math.sin(player.direction) * player.movement_speed;
+                if (direction === 1) {
+                    player.isMoving = direction;
+                } else if (direction === 2) {
+                    player.isMoving = direction;
+                } else if (direction === 3) {
+                    player.isMoving = direction;
+                } else if (direction === 4) {
+                    player.isMoving = direction;
+                }
+            }
+
+            if (client_dataview.getUint8(0) === 2) { // player shoots a projectile
+                const player = websocket.player;
+                const direction = client_dataview.getFloat32(1);
+                if (player.isAlive) {
+                    const projectile = {
+                        x: player.x,
+                        y: player.y,
+                        direction: direction,
+                        movement_speed: config.projectile.defaultMovementSpeed,
+                        width: config.projectile.defaultWidth,
+                        height: config.projectile.defaultHeight,
+                        creation_time: Date.now(),
+                        owner: player.id
+                    };
+                    game.projectiles.push(projectile);
+
+                    // notify all the players of the new projectile
+                    arraybuffer = new ArrayBuffer(1 + 4 + 4 + 4 + 4 + 4);
+                    server_dataview = new DataView(arraybuffer);
+                    server_dataview.setUint8(0, 2);
+                    server_dataview.setFloat32(1, projectile.x);
+                    server_dataview.setFloat32(5, projectile.y);
+                    server_dataview.setFloat32(9, projectile.direction);
+                    server_dataview.setUint32(13, projectile.movement_speed);
+                    server_dataview.setUint32(17, projectile.owner);
+                    ws_server.clients.forEach(client => {
+                        if (client.readyState === WebSocket.OPEN)
+                            client.send(server_dataview);
+                    });
+                }
             }
         }
     });
@@ -88,6 +122,7 @@ ws_server.on('connection', (websocket) => {
 class Game {
     constructor() {
         this.players = [];
+        this.projectiles = [];
         this.mapSize = 100; // width and height
     }
 
@@ -102,12 +137,17 @@ class Game {
             // physics movement and initial starting position
             x: Math.floor(Math.random() * (this.mapSize + 1)),
             y: Math.floor(Math.random() * (this.mapSize + 1)),
-            movement_speed: 0.1,
-            direction: 0, // direction to move in, in radians
-            velocityX: 0,
-            velocityY: 0,
-            targetX: 0, // for click to move
-            targetY: 0,
+            movement_speed: config.player.defaultMovementSpeed,
+
+            // collision
+            width: config.player.collisionWidth,
+            height: config.player.collisionHeight,
+
+            // false for not moving, 1 for left, 2 for up, 3 for right, 4 for down
+            // can be changed to binary bits
+            isMoving: false,
+
+            direction: 0, // direction for shooting, in radians
 
             // Int32Array, 4 bytes, 32-bit two's complement signed integer
             // won't be sent to the player for now
@@ -121,20 +161,54 @@ class Game {
     }
 
     physicsLoop() {
-        this.players.forEach(player => {
-            const threshold = 1;
-            if (Math.abs(player.x - player.targetX) <= threshold && Math.abs(player.y - player.targetY) <= threshold) {
-                player.velocityX = 0;
-                player.velocityY = 0;
-            } else {
-                player.x += player.movement_speed * Math.cos(player.direction);
-                player.y += player.movement_speed * Math.sin(player.direction);
-            }
+        // projectile movement
+        this.projectiles.forEach(projectile => {
+            projectile.x += projectile.movement_speed * Math.cos(projectile.direction);
+            projectile.y += projectile.movement_speed * Math.sin(projectile.direction);
         });
+
+        // player movement
+        this.players.filter(player => {
+            return player.isMoving;
+        })
+            .filter(player => { // collision detection
+                // for now, there is no collision detection
+                return true;
+            })
+            .forEach(player => {
+                if (player.isMoving === 1) {
+                    player.x -= player.movement_speed;
+                } else if (player.isMoving === 2) {
+                    player.y -= player.movement_speed;
+                } else if (player.isMoving === 3) {
+                    player.x += player.movement_speed;
+                } else if (player.isMoving === 4) {
+                    player.y += player.movement_speed;
+                }
+                player.isMoving = false;
+            });
     }
 
     gameLogicLoop() {
         let arraybuffer, dataview;
+
+        // remove projectiles that have exceeded their lifetime of 3000 milliseconds
+        this.projectiles.forEach(projectile => {
+            if (Date.now() - projectile.creation_time >= config.projectile.defaultLifetime) {
+                this.projectiles.splice(this.projectiles.indexOf(projectile), 1);
+            }
+        });
+
+        // projectile-player collisions
+        this.projectiles.forEach(projectile => {
+            this.players.filter(player => {
+                if (projectile.owner !== player.id && player.isAlive === true)
+                    return true;
+            })
+                .forEach(player => {
+                    // no collision for now
+                });
+        });
 
         // respawn players and notify the connected players
         this.players.filter(player => {

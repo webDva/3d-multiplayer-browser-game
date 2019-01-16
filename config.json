@@ -1,5 +1,16 @@
 {
     "PORT": 3000,
     "networkUpdatePulseRate": 10,
-    "physicsTickRate": 30
+    "physicsTickRate": 30,
+    "player": {
+        "defaultMovementSpeed": 1,
+        "collisionWidth": 32,
+        "collisionHeight": 32
+    },
+    "projectile": {
+        "defaultLifetime": 3000,
+        "defaultMovementSpeed": 10,
+        "defaultWidth": 10,
+        "defaultHeight": 10
+    }
 }
