@@ -228,9 +228,8 @@ function lerp(start, end, time) {
 // client-side physics tick
 let lastUpdateTime = Date.now();
 setInterval(() => {
-    const currentTime = Date.now();
-    const deltaTime = currentTime - lastUpdateTime;
-    const lerpTime = 40;
+    const deltaTime = Date.now() - lastUpdateTime;
+    const lerpTime = 50;
 
     if (session_started) {
         // player movement
@@ -253,7 +252,7 @@ setInterval(() => {
         });
     }
 
-    lastUpdateTime = currentTime;
+    lastUpdateTime = Date.now();
 }, 1000 / 30);
 
 // mostly for game logic
@@ -267,6 +266,7 @@ scene.registerBeforeRender(function () {
     // remove projectiles that have lived for too long
     projectile_list.forEach(projectile => {
         if (Date.now() - projectile.creation_time >= 3000) {
+            projectile.mesh.dispose();
             projectile_list.splice(projectile_list.indexOf(projectile), 1);
         }
     });
