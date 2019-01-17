@@ -86,20 +86,7 @@ ws_server.on('connection', (websocket) => {
                         owner: player.id
                     };
                     game.projectiles.push(projectile);
-
-                    // notify all the players of the new projectile
-                    arraybuffer = new ArrayBuffer(1 + 4 + 4 + 4 + 4 + 4);
-                    server_dataview = new DataView(arraybuffer);
-                    server_dataview.setUint8(0, 2);
-                    server_dataview.setFloat32(1, projectile.x);
-                    server_dataview.setFloat32(5, projectile.y);
-                    server_dataview.setFloat32(9, projectile.direction);
-                    server_dataview.setUint32(13, projectile.movement_speed);
-                    server_dataview.setUint32(17, projectile.owner);
-                    ws_server.clients.forEach(client => {
-                        if (client.readyState === WebSocket.OPEN)
-                            client.send(server_dataview);
-                    });
+                    game.new_projectiles.push(projectile);
                 }
             }
         }
@@ -123,6 +110,7 @@ class Game {
     constructor() {
         this.players = [];
         this.projectiles = [];
+        this.new_projectiles = [];
         this.mapSize = 100; // width and height
     }
 
@@ -251,6 +239,30 @@ class Game {
             if (client.readyState === WebSocket.OPEN)
                 client.send(dataview);
         });
+
+        // send newly created projectiles
+        let new_projectiles = [];
+        this.new_projectiles.forEach(projectile => {
+            new_projectiles.push(projectile);
+            this.new_projectiles.splice(this.new_projectiles.indexOf(projectile), 1);
+        });
+        arraybuffer = new ArrayBuffer(1 + 2 + new_projectiles.length * (4 + 4 + 4 + 4 + 4));
+        dataview = new DataView(arraybuffer);
+        dataview.setUint8(0, 2);
+        dataview.setUint16(1, new_projectiles.length);
+        new_projectiles.forEach((projectile, index) => {
+            dataview.setFloat32(3 + index * 20, projectile.x);
+            dataview.setFloat32(7 + index * 20, projectile.y);
+            dataview.setFloat32(11 + index * 20, projectile.direction);
+            dataview.setUint32(15 + index * 20, projectile.movement_speed);
+            dataview.setUint32(19 + index * 20, projectile.owner);
+        });
+        if (new_projectiles.length > 0) {
+            ws_server.clients.forEach(client => {
+                if (client.readyState === WebSocket.OPEN)
+                    client.send(dataview);
+            });
+        }
     }
 }
 

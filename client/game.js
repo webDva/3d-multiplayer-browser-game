@@ -124,19 +124,20 @@ websocket.onmessage = (event) => {
             }
         }
 
-        if (dataview.getUint8(0) === 2) { // newly created projectile update
-            const projectile = {
-                mesh: BABYLON.MeshBuilder.CreateSphere("sphere", {}, scene),
-                direction: dataview.getFloat32(9),
-                movement_speed: dataview.getUint32(13),
-                owner: dataview.getUint32(17),
-                creation_time: Date.now()
-            };
-
-            projectile.mesh.position.y = 1;
-            projectile.mesh.position.z = dataview.getFloat32(1);
-            projectile.mesh.position.x = dataview.getFloat32(5);
-            projectile_list.push(projectile);
+        if (dataview.getUint8(0) === 2) { // newly created projectiles update
+            for (let i = 0; i < dataview.getUint16(1); i++) {
+                const projectile = {
+                    mesh: BABYLON.MeshBuilder.CreateSphere("sphere", {}, scene),
+                    direction: dataview.getFloat32(11 + i * 20),
+                    movement_speed: dataview.getUint32(15 + i * 20),
+                    owner: dataview.getUint32(19 + i * 20),
+                    creation_time: Date.now()
+                };
+                projectile.mesh.position.y = 1;
+                projectile.mesh.position.z = dataview.getFloat32(3 + i * 20);
+                projectile.mesh.position.x = dataview.getFloat32(7 + i * 20);
+                projectile_list.push(projectile);
+            }
         }
 
         // no player deaths for now
