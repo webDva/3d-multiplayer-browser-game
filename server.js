@@ -111,7 +111,7 @@ class Game {
         this.players = [];
         this.projectiles = [];
         this.new_projectiles = [];
-        this.mapSize = 100; // width and height
+        this.mapSize = 25; // width and height
     }
 
     addPlayer() {

@@ -45,8 +45,8 @@ class Client {
     }
 }
 
-const send_rate = 800;
-const clients = 10;
+const send_rate = 1700;
+const clients = 20;
 
 console.log(`${clients} clients connecting at a send rate of ${send_rate}.`);
 

@@ -229,7 +229,7 @@ function lerp(start, end, time) {
 let lastUpdateTime = Date.now();
 setInterval(() => {
     const deltaTime = Date.now() - lastUpdateTime;
-    const lerpTime = 50;
+    const lerpTime = 60;
 
     if (session_started) {
         // player movement
