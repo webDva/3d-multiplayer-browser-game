@@ -147,7 +147,7 @@ class Game {
             // can be changed to binary bits
             isMoving: false,
 
-            direction: 0, // direction for shooting, in radians
+            direction: 0, // direction for shooting and avatar facing, in radians
 
             // Int32Array, 4 bytes, 32-bit two's complement signed integer
             // won't be sent to the player for now

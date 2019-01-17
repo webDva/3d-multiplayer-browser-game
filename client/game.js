@@ -7,11 +7,10 @@ BABYLON.Animation.AllowMatricesInterpolation = true;
 const scene = new BABYLON.Scene(engine);
 //scene.debugLayer.show();
 scene.clearColor = new BABYLON.Color3(1, 1, 1);
-
-const camera = new BABYLON.ArcRotateCamera("Camera", 1, 1, 4, new BABYLON.Vector3(-10, 10, 20), scene);
-camera.attachControl(canvas, false);
 scene.collisionsEnabled = true;
-camera.checkCollisions = true;
+
+const camera = new BABYLON.FollowCamera('camera', new BABYLON.Vector3(0, 0, 0), scene);
+camera.attachControl(canvas, false);
 
 const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, -100, 0), scene);
 light.diffuse = new BABYLON.Color3(1, 1, 1);
@@ -90,7 +89,10 @@ websocket.onmessage = (event) => {
             const player_object = player_list.find(player_object => player_object.id === player.id);
             player.mesh = player_object.mesh;
             player.mesh.material.emissiveColor = new BABYLON.Color4(0, 1, 0, 1);
-            camera.target = player.mesh;
+            camera.lockedTarget = player.mesh;
+
+            dummy.position.x = player.mesh.position.x;
+            dummy.position.z = player.mesh.position.z;
 
             session_started = true;
         }
@@ -154,15 +156,19 @@ document.addEventListener('keydown', event => {
     switch (char) {
         case 'W':
             player.up = true;
+            player.mesh.position.x -= 1.5;
             break;
         case 'A':
             player.left = true;
+            player.mesh.position.z -= 1.5;
             break;
         case 'S':
             player.down = true;
+            player.mesh.position.x += 1.5;
             break;
         case 'D':
             player.right = true;
+            player.mesh.position.z += 1.5;
             break;
     }
 });
@@ -223,17 +229,16 @@ let lastUpdateTime = Date.now();
 setInterval(() => {
     const currentTime = Date.now();
     const deltaTime = currentTime - lastUpdateTime;
-    const lerpTime = 800;
+    const lerpTime = 40;
 
     if (session_started) {
+        // player movement
         if (deltaTime <= lerpTime) { // lerp
-            // player movement
             player_list.forEach(player_object => {
                 player_object.mesh.position.z = lerp(player_object.mesh.position.z, player_object.x, deltaTime / lerpTime);
                 player_object.mesh.position.x = lerp(player_object.mesh.position.x, player_object.y, deltaTime / lerpTime);
             });
         } else { // don't lerp
-            // player movement
             player_list.forEach(player_object => {
                 player_object.mesh.position.z = player_object.x;
                 player_object.mesh.position.x = player_object.y;
@@ -252,6 +257,12 @@ setInterval(() => {
 
 // mostly for game logic
 scene.registerBeforeRender(function () {
+    if (session_started) {
+        camera.position.x = player.mesh.position.x + 25;
+        camera.position.y = player.mesh.position.y + 25;
+        camera.position.z = player.mesh.position.z;
+    }
+
     // remove projectiles that have lived for too long
     projectile_list.forEach(projectile => {
         if (Date.now() - projectile.creation_time >= 3000) {
