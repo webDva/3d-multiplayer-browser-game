@@ -1,7 +1,7 @@
 const WebSocket = require('ws');
 
 class Client {
-    constructor(send_rate) {
+    constructor(move_rate, shoot_rate) {
         this.session_started = false;
 
         this.websocket = new WebSocket('ws://localhost:3000');
@@ -26,30 +26,36 @@ class Client {
         setInterval(() => {
             if (this.session_started) {
                 // move in a random direction
-                let arraybuffer = new ArrayBuffer(2);
-                let dataview = new DataView(arraybuffer);
+                const arraybuffer = new ArrayBuffer(2);
+                const dataview = new DataView(arraybuffer);
                 dataview.setUint8(0, 1);
                 dataview.setUint8(1, Math.floor(Math.random() * (4 + 1)));
                 this.websocket.send(dataview);
                 //console.log(`Client ${this.id} sent random movement direction.`);
+            }
+        }, move_rate);
 
+        const minimum = shoot_rate - 15000;
+        setInterval(() => {
+            if (this.session_started) {
                 // shoot in a random direction in radians
-                arraybuffer = new ArrayBuffer(5);
-                dataview = new DataView(arraybuffer);
+                const arraybuffer = new ArrayBuffer(5);
+                const dataview = new DataView(arraybuffer);
                 dataview.setUint8(0, 2);
                 dataview.setFloat32(1, Math.floor(Math.random() * (2 * Math.PI + 1)));
                 this.websocket.send(dataview);
-                //console.log(`Client ${this.id} sent random projectile.`);
+                //console.log(`Client ${this.id} sent random projectile.`);   
             }
-        }, send_rate);
+        }, Math.floor(Math.random() * (shoot_rate - minimum + 1) + minimum));
     }
 }
 
-const send_rate = 1700;
+const move_rate = 200;
+const shoot_rate = 30000; // must be greater than 15000
 const clients = 20;
 
-console.log(`${clients} clients connecting at a send rate of ${send_rate}.`);
+console.log(`${clients} clients connecting at a move rate of ${move_rate} and a shoot rate of ${shoot_rate - 15000} to ${shoot_rate}.`);
 
 for (let i = 0; i < clients; i++) {
-    new Client(send_rate);
+    new Client(move_rate, shoot_rate);
 }

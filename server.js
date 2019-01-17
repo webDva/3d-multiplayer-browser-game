@@ -294,6 +294,6 @@ setInterval(() => {
         }
 
         websocket.isAlive = false;
-        websocket.ping();
+        websocket.ping(); // show stopping error can occur here
     });
 }, 40000);
