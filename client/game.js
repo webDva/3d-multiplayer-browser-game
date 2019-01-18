@@ -76,33 +76,31 @@ websocket.onmessage = (event) => {
 
         if (data.type === 'welcome') {
             player.id = data.id;
-            data.player_list.forEach(player => {
-                const mesh = BABYLON.MeshBuilder.CreateBox("box", {}, scene);
-                mesh.position.y = 1;
-                mesh.material = new BABYLON.StandardMaterial("standardmaterial", scene);
-                mesh.material.emissiveColor = new BABYLON.Color4(1, 0, 0, 1);
-                player_list.push({ id: player.id, x: player.x, y: player.y, mesh: mesh });
-                mesh.position.z = player.x;
-                mesh.position.x = player.y;
+            data.player_list.forEach(player_data => {
+                BABYLON.SceneLoader.ImportMeshAsync('', './', 'kawaii.babylon', scene).then(function (imported) {
+                    const mesh = imported.meshes[0];
+                    player_list.push({ id: player_data.id, x: player_data.x, y: player_data.y, mesh: mesh });
+                    mesh.position.z = player_data.x;
+                    mesh.position.x = player_data.y;
+
+                    if (player_data.id === player.id) {
+                        player.mesh = mesh;
+                        camera.lockedTarget = player.mesh;
+
+                        dummy.position.x = player.mesh.position.x;
+                        dummy.position.z = player.mesh.position.z;
+
+                        session_started = true;
+                    }
+                });
             });
-
-            const player_object = player_list.find(player_object => player_object.id === player.id);
-            player.mesh = player_object.mesh;
-            player.mesh.material.emissiveColor = new BABYLON.Color4(0, 1, 0, 1);
-            camera.lockedTarget = player.mesh;
-
-            dummy.position.x = player.mesh.position.x;
-            dummy.position.z = player.mesh.position.z;
-
-            session_started = true;
         }
 
         if (data.type === 'new_player' && session_started) {
-            const mesh = BABYLON.MeshBuilder.CreateBox("box", {}, scene);
-            mesh.position.y = 1;
-            mesh.material = new BABYLON.StandardMaterial("standardmaterial", scene);
-            mesh.material.emissiveColor = new BABYLON.Color4(1, 0, 0, 1);
-            player_list.push({ id: data.id, x: data.x, y: data.y, mesh: mesh });
+            BABYLON.SceneLoader.ImportMeshAsync('', './', 'kawaii.babylon', scene).then(function (imported) {
+                const mesh = imported.meshes[0];
+                player_list.push({ id: data.id, x: data.x, y: data.y, mesh: mesh });
+            });
         }
 
         if (data.type === 'player_disconnect') {
