@@ -51,18 +51,18 @@ const player = {
     id: null,
     mesh: null,
 
-    left: false,
-    up: false,
-    right: false,
-    down: false,
+    movement: {
+        isMoving: false,
+        x: 0,
+        y: 0
+    },
 
     combat: {
-        isShooting: false,
-        direction: 0
+        target: null,
+        attack: null
     }
 };
 let player_list = [];
-let projectile_list = [];
 let session_started = false;
 
 // configure WebSocket client
@@ -122,22 +122,6 @@ websocket.onmessage = (event) => {
             }
         }
 
-        if (dataview.getUint8(0) === 2) { // newly created projectiles update
-            for (let i = 0; i < dataview.getUint16(1); i++) {
-                const projectile = {
-                    mesh: BABYLON.MeshBuilder.CreateSphere("sphere", {}, scene),
-                    direction: dataview.getFloat32(11 + i * 20),
-                    movement_speed: dataview.getUint32(15 + i * 20),
-                    owner: dataview.getUint32(19 + i * 20),
-                    creation_time: Date.now()
-                };
-                projectile.mesh.position.y = 1;
-                projectile.mesh.position.z = dataview.getFloat32(3 + i * 20);
-                projectile.mesh.position.x = dataview.getFloat32(7 + i * 20);
-                projectile_list.push(projectile);
-            }
-        }
-
         // no player deaths for now
 
         // no player respawns either
@@ -149,34 +133,16 @@ websocket.onopen = () => {
     websocket.send(JSON.stringify({ type: 'join' }));
 };
 
-// control for movement
-document.addEventListener('keydown', event => {
-    const char = String.fromCharCode(event.keyCode);
-    switch (char) {
-        case 'W':
-            player.up = true;
-            player.mesh.position.x -= 1.5;
-            break;
-        case 'A':
-            player.left = true;
-            player.mesh.position.z -= 1.5;
-            break;
-        case 'S':
-            player.down = true;
-            player.mesh.position.x += 1.5;
-            break;
-        case 'D':
-            player.right = true;
-            player.mesh.position.z += 1.5;
-            break;
+scene.onPointerObservable.add(pointerInfo => {
+    if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN && pointerInfo.pickInfo.pickedMesh && pointerInfo.pickInfo.pickedMesh !== ground) {
+        const player_object = player_list.find(player_object => player_object.mesh === pointerInfo.pickInfo.pickedMesh);
+        player.combat.target = player_object.id;
+        player.combat.attack = 100;
+    } else if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN && pointerInfo.pickInfo.pickedMesh === ground) {
+        player.movement.isMoving = true;
+        player.movement.x = pointerInfo.pickInfo.pickedPoint.z;
+        player.movement.y = pointerInfo.pickInfo.pickedPoint.x;
     }
-});
-
-// control for shooting
-document.addEventListener('click', function () {
-    const pickResult = scene.pick(scene.pointerX, scene.pointerY);
-    player.combat.direction = Math.atan2(pickResult.pickedPoint.x - player.mesh.position.x, pickResult.pickedPoint.z - player.mesh.position.z);
-    player.combat.isShooting = true;
 });
 
 // client network update pulse
@@ -185,37 +151,20 @@ setInterval(() => {
     const dataview = new DataView(arraybuffer);
 
     // player wants to move
-    if (player.left) {
+    if (player.movement.isMoving) {
+        player.movement.isMoving = false;
         dataview.setUint8(0, 1);
-        dataview.setUint8(1, 1);
+        dataview.setFloat32(1, player.movement.x);
+        dataview.setFloat32(5, player.movement.y);
         websocket.send(dataview);
-        player.left = false;
-    }
-    if (player.up) {
-        dataview.setUint8(0, 1);
-        dataview.setUint8(1, 2);
-        websocket.send(dataview);
-        player.up = false;
-    }
-    if (player.right) {
-        dataview.setUint8(0, 1);
-        dataview.setUint8(1, 3);
-        websocket.send(dataview);
-        player.right = false;
-    }
-    if (player.down) {
-        dataview.setUint8(0, 1);
-        dataview.setUint8(1, 4);
-        websocket.send(dataview);
-        player.down = false;
     }
 
-    // player wants to shoot
-    if (player.combat.isShooting) {
-        dataview.setUint8(0, 2);
-        dataview.setFloat32(1, player.combat.direction);
+    if (player.combat.attack) {
+        dataview.setUint8(0, 3);
+        dataview.setUint32(1, player.combat.target);
+        dataview.setUint8(5, player.combat.attack);
         websocket.send(dataview);
-        player.combat.isShooting = false;
+        player.combat.attack = null;
     }
 }, 1000 / 20);
 
@@ -242,12 +191,6 @@ setInterval(() => {
                 player_object.mesh.position.x = player_object.y;
             });
         }
-
-        // projectile movement
-        projectile_list.forEach(projectile => {
-            projectile.mesh.position.z += projectile.movement_speed * Math.cos(projectile.direction);
-            projectile.mesh.position.x += projectile.movement_speed * Math.sin(projectile.direction);
-        });
     }
 
     lastUpdateTime = Date.now();
@@ -258,16 +201,8 @@ scene.registerBeforeRender(function () {
     if (session_started) {
         camera.position.x = player.mesh.position.x + 25;
         camera.position.y = player.mesh.position.y + 25;
-        camera.position.z = player.mesh.position.z;
+        camera.position.z = player.mesh.position.z - 25;
     }
-
-    // remove projectiles that have lived for too long
-    projectile_list.forEach(projectile => {
-        if (Date.now() - projectile.creation_time >= 3000) {
-            projectile.mesh.dispose();
-            projectile_list.splice(projectile_list.indexOf(projectile), 1);
-        }
-    });
 });
 
 engine.runRenderLoop(function () {

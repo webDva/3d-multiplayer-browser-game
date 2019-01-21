@@ -58,36 +58,24 @@ ws_server.on('connection', (websocket) => {
             const client_dataview = new DataView(message);
 
             if (client_dataview.getUint8(0) === 1) { // player movement
-                const direction = client_dataview.getUint8(1); // direction to move in (left:1, up:2, right:3, down:4)
                 const player = websocket.player;
-                if (direction === 1) {
-                    player.isMoving = direction;
-                } else if (direction === 2) {
-                    player.isMoving = direction;
-                } else if (direction === 3) {
-                    player.isMoving = direction;
-                } else if (direction === 4) {
-                    player.isMoving = direction;
-                }
+                player.isMoving = true;
+                // change the player's direction
+                player.direction = Math.atan2(client_dataview.getFloat32(5) - player.y, client_dataview.getFloat32(1) - player.x);
+                // change the player's target destination
+                player.targetX = client_dataview.getFloat32(1);
+                player.targetY = client_dataview.getFloat32(5);
+                // change the player's velocity
+                player.velocityX = Math.cos(player.direction) * player.movement_speed;
+                player.velocityY = Math.sin(player.direction) * player.movement_speed;
             }
 
-            if (client_dataview.getUint8(0) === 2) { // player shoots a projectile
+            if (client_dataview.getUint8(0) === 3) { // player is attacking someone or something
                 const player = websocket.player;
-                const direction = client_dataview.getFloat32(1);
-                if (player.isAlive) {
-                    const projectile = {
-                        x: player.x,
-                        y: player.y,
-                        direction: direction,
-                        movement_speed: config.projectile.defaultMovementSpeed,
-                        width: config.projectile.defaultWidth,
-                        height: config.projectile.defaultHeight,
-                        creation_time: Date.now(),
-                        owner: player.id
-                    };
-                    game.projectiles.push(projectile);
-                    game.new_projectiles.push(projectile);
-                }
+                const target = client_dataview.getUint32(1); // player ID or mob ID
+                const attack = client_dataview.getUint8(5); // attack type or ID, an unsigned byte
+                // for now, just log
+                console.log(`Player ${player.id} attacked target ${target} with attack ${attack}`);
             }
         }
     });
@@ -109,8 +97,6 @@ ws_server.on('connection', (websocket) => {
 class Game {
     constructor() {
         this.players = [];
-        this.projectiles = [];
-        this.new_projectiles = [];
         this.mapSize = 25; // width and height
     }
 
@@ -131,11 +117,14 @@ class Game {
             width: config.player.collisionWidth,
             height: config.player.collisionHeight,
 
-            // false for not moving, 1 for left, 2 for up, 3 for right, 4 for down
-            // can be changed to binary bits
-            isMoving: false,
-
             direction: 0, // direction for shooting and avatar facing, in radians
+
+            // for click-to-move
+            velocityX: 0,
+            velocityY: 0,
+            targetX: 0,
+            targetY: 0,
+            isMoving: false,
 
             // Int32Array, 4 bytes, 32-bit two's complement signed integer
             // won't be sent to the player for now
@@ -149,12 +138,6 @@ class Game {
     }
 
     physicsLoop() {
-        // projectile movement
-        this.projectiles.forEach(projectile => {
-            projectile.x += projectile.movement_speed * Math.cos(projectile.direction);
-            projectile.y += projectile.movement_speed * Math.sin(projectile.direction);
-        });
-
         // player movement
         this.players.filter(player => {
             return player.isMoving;
@@ -164,39 +147,20 @@ class Game {
                 return true;
             })
             .forEach(player => {
-                if (player.isMoving === 1) {
-                    player.x -= player.movement_speed;
-                } else if (player.isMoving === 2) {
-                    player.y -= player.movement_speed;
-                } else if (player.isMoving === 3) {
-                    player.x += player.movement_speed;
-                } else if (player.isMoving === 4) {
-                    player.y += player.movement_speed;
+                const threshold = 1;
+                if (Math.abs(player.x - player.targetX) <= threshold && Math.abs(player.y - player.targetY) <= threshold) {
+                    player.velocityX = 0;
+                    player.velocityY = 0;
+                    player.isMoving = false;
+                } else {
+                    player.x += player.movement_speed * Math.cos(player.direction);
+                    player.y += player.movement_speed * Math.sin(player.direction);
                 }
-                player.isMoving = false;
             });
     }
 
     gameLogicLoop() {
         let arraybuffer, dataview;
-
-        // remove projectiles that have exceeded their lifetime of 3000 milliseconds
-        this.projectiles.forEach(projectile => {
-            if (Date.now() - projectile.creation_time >= config.projectile.defaultLifetime) {
-                this.projectiles.splice(this.projectiles.indexOf(projectile), 1);
-            }
-        });
-
-        // projectile-player collisions
-        this.projectiles.forEach(projectile => {
-            this.players.filter(player => {
-                if (projectile.owner !== player.id && player.isAlive === true)
-                    return true;
-            })
-                .forEach(player => {
-                    // no collision for now
-                });
-        });
 
         // respawn players and notify the connected players
         this.players.filter(player => {
@@ -239,30 +203,6 @@ class Game {
             if (client.readyState === WebSocket.OPEN)
                 client.send(dataview);
         });
-
-        // send newly created projectiles
-        let new_projectiles = [];
-        this.new_projectiles.forEach(projectile => {
-            new_projectiles.push(projectile);
-            this.new_projectiles.splice(this.new_projectiles.indexOf(projectile), 1);
-        });
-        arraybuffer = new ArrayBuffer(1 + 2 + new_projectiles.length * (4 + 4 + 4 + 4 + 4));
-        dataview = new DataView(arraybuffer);
-        dataview.setUint8(0, 2);
-        dataview.setUint16(1, new_projectiles.length);
-        new_projectiles.forEach((projectile, index) => {
-            dataview.setFloat32(3 + index * 20, projectile.x);
-            dataview.setFloat32(7 + index * 20, projectile.y);
-            dataview.setFloat32(11 + index * 20, projectile.direction);
-            dataview.setUint32(15 + index * 20, projectile.movement_speed);
-            dataview.setUint32(19 + index * 20, projectile.owner);
-        });
-        if (new_projectiles.length > 0) {
-            ws_server.clients.forEach(client => {
-                if (client.readyState === WebSocket.OPEN)
-                    client.send(dataview);
-            });
-        }
     }
 }
 
