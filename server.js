@@ -33,7 +33,8 @@ ws_server.on('connection', (websocket) => {
                     players_list.push({
                         id: user.id,
                         x: user.x,
-                        y: user.y
+                        y: user.y,
+                        direction: user.direction
                     });
                 });
                 websocket.send(JSON.stringify({
@@ -48,7 +49,8 @@ ws_server.on('connection', (websocket) => {
                             type: 'new_player',
                             id: websocket.player.id,
                             x: websocket.player.x,
-                            y: websocket.player.y
+                            y: websocket.player.y,
+                            direction: websocket.player.direction
                         }));
                 });
             }
@@ -117,7 +119,7 @@ class Game {
             width: config.player.collisionWidth,
             height: config.player.collisionHeight,
 
-            direction: 0, // direction for shooting and avatar facing, in radians
+            direction: 0, // direction for attacking and avatar facing, in radians
 
             // for click-to-move
             velocityX: 0,
@@ -188,16 +190,16 @@ class Game {
     sendNetworkUpdates() {
         let arraybuffer, dataview;
 
-        // send player positions
-        arraybuffer = new ArrayBuffer(1 + 1 + this.players.length * (4 + 4 + 4));
+        // send player orientations
+        arraybuffer = new ArrayBuffer(1 + 1 + this.players.length * (4 + 4 + 4 + 4));
         dataview = new DataView(arraybuffer);
         dataview.setUint8(0, 1); // one byte unsigned event/message type
         dataview.setUint8(1, this.players.length); // number of player binary data structures
         this.players.forEach((player, index) => {
-            dataview.setUint32(2 + index * 12, player.id);
-            dataview.setFloat32(6 + index * 12, player.x);
-            dataview.setFloat32(10 + index * 12, player.y);
-
+            dataview.setUint32(2 + index * 16, player.id);
+            dataview.setFloat32(6 + index * 16, player.x);
+            dataview.setFloat32(10 + index * 16, player.y);
+            dataview.setFloat32(14 + index * 16, player.direction);
         });
         ws_server.clients.forEach(client => {
             if (client.readyState === WebSocket.OPEN)

@@ -79,7 +79,7 @@ websocket.onmessage = (event) => {
             data.player_list.forEach(player_data => {
                 BABYLON.SceneLoader.ImportMeshAsync('', './', 'kawaii.babylon', scene).then(function (imported) {
                     const mesh = imported.meshes[0];
-                    player_list.push({ id: player_data.id, x: player_data.x, y: player_data.y, mesh: mesh });
+                    player_list.push({ id: player_data.id, x: player_data.x, y: player_data.y, mesh: mesh, direction: player_data.direction });
                     mesh.position.z = player_data.x;
                     mesh.position.x = player_data.y;
 
@@ -99,7 +99,7 @@ websocket.onmessage = (event) => {
         if (data.type === 'new_player' && session_started) {
             BABYLON.SceneLoader.ImportMeshAsync('', './', 'kawaii.babylon', scene).then(function (imported) {
                 const mesh = imported.meshes[0];
-                player_list.push({ id: data.id, x: data.x, y: data.y, mesh: mesh });
+                player_list.push({ id: data.id, x: data.x, y: data.y, mesh: mesh, direction: data.direction });
             });
         }
 
@@ -114,11 +114,12 @@ websocket.onmessage = (event) => {
     if (event.data instanceof ArrayBuffer && session_started) {
         const dataview = new DataView(event.data);
 
-        if (dataview.getUint8(0) === 1) { // player positions
+        if (dataview.getUint8(0) === 1) { // player orientations
             for (let i = 0; i < dataview.getUint8(1); i++) {
-                const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(2 + i * 12));
-                player_object.x = dataview.getFloat32(6 + i * 12);
-                player_object.y = dataview.getFloat32(10 + i * 12);
+                const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(2 + i * 16));
+                player_object.x = dataview.getFloat32(6 + i * 16);
+                player_object.y = dataview.getFloat32(10 + i * 16);
+                player_object.direction = dataview.getFloat32(14 + i * 16);
             }
         }
 
@@ -179,16 +180,18 @@ setInterval(() => {
     const lerpTime = 60;
 
     if (session_started) {
-        // player movement
+        // player orientations
         if (deltaTime <= lerpTime) { // lerp
             player_list.forEach(player_object => {
                 player_object.mesh.position.z = lerp(player_object.mesh.position.z, player_object.x, deltaTime / lerpTime);
                 player_object.mesh.position.x = lerp(player_object.mesh.position.x, player_object.y, deltaTime / lerpTime);
+                player_object.mesh.rotation.y = lerp(player_object.mesh.rotation.y, player_object.direction, deltaTime / lerpTime);
             });
         } else { // don't lerp
             player_list.forEach(player_object => {
                 player_object.mesh.position.z = player_object.x;
                 player_object.mesh.position.x = player_object.y;
+                player_object.mesh.rotation.y = player_object.direction;
             });
         }
     }
