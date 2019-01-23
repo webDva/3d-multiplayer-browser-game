@@ -1,5 +1,5 @@
 const canvas = document.getElementById("canvas");
-const engine = new BABYLON.Engine(canvas, true);
+const engine = new BABYLON.Engine(canvas, true, { stencil: true });
 
 // This is really important to tell Babylon.js to use decomposeLerp and matrix interpolation
 BABYLON.Animation.AllowMatricesInterpolation = true;
@@ -41,6 +41,9 @@ ground.material.lineColor = new BABYLON.Color3(0, 0, 0);
 ground.material.gridRatio = 1;
 ground.material.majorUnitFrequency = 0;
 ground.checkCollisions = true;
+
+// highlight layer for highlighting meshes
+const targetSelectionHighlightLayer = new BABYLON.HighlightLayer("highlightlayer", scene);
 
 // dummy mesh
 const dummy = BABYLON.MeshBuilder.CreateBox("box", {}, scene);
@@ -94,6 +97,9 @@ websocket.onmessage = (event) => {
                     }
                 });
             });
+
+            // display DOM user interface
+            document.getElementById('attack-buttons').style.display = 'block';
         }
 
         if (data.type === 'new_player' && session_started) {
@@ -137,8 +143,20 @@ websocket.onopen = () => {
 scene.onPointerObservable.add(pointerInfo => {
     if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN && pointerInfo.pickInfo.pickedMesh && pointerInfo.pickInfo.pickedMesh !== ground) {
         const player_object = player_list.find(player_object => player_object.mesh === pointerInfo.pickInfo.pickedMesh);
-        player.combat.target = player_object.id;
-        player.combat.attack = 100;
+        if (targetSelectionHighlightLayer.selectedMesh === player_object.mesh) { // de-select or de-highlight
+            targetSelectionHighlightLayer.removeMesh(targetSelectionHighlightLayer.selectedMesh);
+            targetSelectionHighlightLayer.selectedMesh = null;
+        } else {
+            if (targetSelectionHighlightLayer.selectedMesh) { // remove previous highlight
+                targetSelectionHighlightLayer.removeMesh(targetSelectionHighlightLayer.selectedMesh);
+            }
+            targetSelectionHighlightLayer.selectedMesh = player_object.mesh;
+            targetSelectionHighlightLayer.addMesh(player_object.mesh, BABYLON.Color3.Green());
+        }
+
+        // remove later until add to new DOM UI attack button
+        // player.combat.target = player_object.id;
+        // player.combat.attack = 100;
     } else if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN && pointerInfo.pickInfo.pickedMesh === ground) {
         player.movement.isMoving = true;
         player.movement.x = pointerInfo.pickInfo.pickedPoint.z;
@@ -199,7 +217,7 @@ setInterval(() => {
     lastUpdateTime = Date.now();
 }, 1000 / 30);
 
-// mostly for game logic
+// mostly for game logic and animation stuff
 scene.registerBeforeRender(function () {
     if (session_started) {
         camera.position.x = player.mesh.position.x + 25;
