@@ -82,6 +82,7 @@ websocket.onmessage = (event) => {
             data.player_list.forEach(player_data => {
                 BABYLON.SceneLoader.ImportMeshAsync('', './', 'kawaii.babylon', scene).then(function (imported) {
                     const mesh = imported.meshes[0];
+                    mesh.KGAME_TYPE = 1; // KGAME_TYPE 1 means that it is a kawaii game mesh of type 1
                     player_list.push({ id: player_data.id, x: player_data.x, y: player_data.y, mesh: mesh, direction: player_data.direction });
                     mesh.position.z = player_data.x;
                     mesh.position.x = player_data.y;
@@ -105,6 +106,7 @@ websocket.onmessage = (event) => {
         if (data.type === 'new_player' && session_started) {
             BABYLON.SceneLoader.ImportMeshAsync('', './', 'kawaii.babylon', scene).then(function (imported) {
                 const mesh = imported.meshes[0];
+                mesh.KGAME_TYPE = 1;
                 player_list.push({ id: data.id, x: data.x, y: data.y, mesh: mesh, direction: data.direction });
             });
         }
@@ -141,17 +143,25 @@ websocket.onopen = () => {
 };
 
 scene.onPointerObservable.add(pointerInfo => {
-    if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN && pointerInfo.pickInfo.pickedMesh && pointerInfo.pickInfo.pickedMesh !== ground) {
+    if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN && pointerInfo.pickInfo.pickedMesh && pointerInfo.pickInfo.pickedMesh.KGAME_TYPE === 1) {
         const player_object = player_list.find(player_object => player_object.mesh === pointerInfo.pickInfo.pickedMesh);
-        if (targetSelectionHighlightLayer.selectedMesh === player_object.mesh) { // de-select or de-highlight
+        if (targetSelectionHighlightLayer.selectedMesh === player_object.mesh) { // de-select or de-highlight if already selected
             targetSelectionHighlightLayer.removeMesh(targetSelectionHighlightLayer.selectedMesh);
+            targetSelectionHighlightLayer.selectedMesh.selectionCircle.dispose();
             targetSelectionHighlightLayer.selectedMesh = null;
         } else {
-            if (targetSelectionHighlightLayer.selectedMesh) { // remove previous highlight
+            if (targetSelectionHighlightLayer.selectedMesh) { // remove previous highlight and selection circle underneath
+                targetSelectionHighlightLayer.selectedMesh.selectionCircle.dispose();
                 targetSelectionHighlightLayer.removeMesh(targetSelectionHighlightLayer.selectedMesh);
             }
             targetSelectionHighlightLayer.selectedMesh = player_object.mesh;
             targetSelectionHighlightLayer.addMesh(player_object.mesh, BABYLON.Color3.Green());
+            targetSelectionHighlightLayer.selectedMesh.selectionCircle = BABYLON.Mesh.CreateDisc('selectionCircle', 5, 12, scene);
+            targetSelectionHighlightLayer.selectedMesh.selectionCircle.material = new BABYLON.StandardMaterial('standardmaterial', scene);
+            targetSelectionHighlightLayer.selectedMesh.selectionCircle.material.emissiveColor = new BABYLON.Color4(0, 1, 0, 1);
+            targetSelectionHighlightLayer.selectedMesh.selectionCircle.parent = targetSelectionHighlightLayer.selectedMesh;
+            targetSelectionHighlightLayer.selectedMesh.selectionCircle.position.y = 0.25;
+            targetSelectionHighlightLayer.selectedMesh.selectionCircle.rotation.x = Math.PI / 2;
         }
 
         // remove later until add to new DOM UI attack button
@@ -223,6 +233,10 @@ scene.registerBeforeRender(function () {
         camera.position.x = player.mesh.position.x + 25;
         camera.position.y = player.mesh.position.y + 25;
         camera.position.z = player.mesh.position.z - 25;
+
+        if (targetSelectionHighlightLayer.selectedMesh) {
+            targetSelectionHighlightLayer.selectedMesh.selectionCircle.rotation.y += 0.01;
+        }
     }
 });
 

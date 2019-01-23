@@ -5,6 +5,7 @@ class Client {
         this.session_started = false;
 
         this.websocket = new WebSocket('ws://localhost:3000');
+        //this.websocket = new WebSocket('https://privatebuild.herokuapp.com');
         this.websocket.binaryType = 'arraybuffer';
 
         this.websocket.onmessage = (event) => {
