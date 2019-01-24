@@ -69,6 +69,38 @@ const player = {
 let player_list = [];
 let session_started = false;
 
+function create_player(player_data, id = null) {
+    BABYLON.SceneLoader.ImportMeshAsync('', './', 'kawaii.babylon', scene).then(function (imported) {
+        const mesh = imported.meshes[0];
+
+        // animation
+        mesh.skeleton.animationPropertiesOverride = new BABYLON.AnimationPropertiesOverride();
+        mesh.skeleton.animationPropertiesOverride.enableBlending = true;
+        mesh.skeleton.animationPropertiesOverride.blendingSpeed = 0.2;
+        mesh.skeleton.animationPropertiesOverride.loopMode = 1;
+        mesh.idleRange = mesh.skeleton.getAnimationRange('Idle');
+        mesh.runRange = mesh.skeleton.getAnimationRange('Run');
+        scene.beginAnimation(mesh.skeleton, mesh.idleRange.from, mesh.idleRange.to, true, 1);
+
+        mesh.KGAME_TYPE = 1; // KGAME_TYPE 1 means that it is a kawaii game mesh of type 1
+        player_list.push({ id: player_data.id, x: player_data.x, y: player_data.y, mesh: mesh, direction: player_data.direction, previousX: player_data.x, previousY: player_data.y });
+        mesh.position.z = player_data.x;
+        mesh.position.x = player_data.y;
+
+        // fill player's personal player object if the id belongs to the player and start the session
+        if (id && player_data.id === id) {
+            player.mesh = mesh;
+            camera.lockedTarget = player.mesh;
+            //camera.target = player.mesh;
+
+            dummy.position.x = player.mesh.position.x;
+            dummy.position.z = player.mesh.position.z;
+
+            session_started = true;
+        }
+    });
+}
+
 // configure WebSocket client
 
 const websocket = new WebSocket(((window.location.protocol === 'https:') ? 'wss://' : 'ws://') + window.location.host);
@@ -81,34 +113,7 @@ websocket.onmessage = (event) => {
         if (data.type === 'welcome') {
             player.id = data.id;
             data.player_list.forEach(player_data => {
-                BABYLON.SceneLoader.ImportMeshAsync('', './', 'kawaii.babylon', scene).then(function (imported) {
-                    const mesh = imported.meshes[0];
-
-                    // animation
-                    mesh.skeleton.animationPropertiesOverride = new BABYLON.AnimationPropertiesOverride();
-                    mesh.skeleton.animationPropertiesOverride.enableBlending = true;
-                    mesh.skeleton.animationPropertiesOverride.blendingSpeed = 0.2;
-                    mesh.skeleton.animationPropertiesOverride.loopMode = 1;
-                    mesh.idleRange = mesh.skeleton.getAnimationRange('Idle');
-                    mesh.runRange = mesh.skeleton.getAnimationRange('Run');
-                    scene.beginAnimation(mesh.skeleton, mesh.idleRange.from, mesh.idleRange.to, true, 1);
-
-                    mesh.KGAME_TYPE = 1; // KGAME_TYPE 1 means that it is a kawaii game mesh of type 1
-                    player_list.push({ id: player_data.id, x: player_data.x, y: player_data.y, mesh: mesh, direction: player_data.direction, previousX: player_data.x, previousY: player_data.y });
-                    mesh.position.z = player_data.x;
-                    mesh.position.x = player_data.y;
-
-                    if (player_data.id === player.id) {
-                        player.mesh = mesh;
-                        camera.lockedTarget = player.mesh;
-                        //camera.target = player.mesh;
-
-                        dummy.position.x = player.mesh.position.x;
-                        dummy.position.z = player.mesh.position.z;
-
-                        session_started = true;
-                    }
-                });
+                create_player(player_data, player.id);
             });
 
             // display DOM user interface
@@ -116,21 +121,7 @@ websocket.onmessage = (event) => {
         }
 
         if (data.type === 'new_player' && session_started) {
-            BABYLON.SceneLoader.ImportMeshAsync('', './', 'kawaii.babylon', scene).then(function (imported) {
-                const mesh = imported.meshes[0];
-
-                // animation
-                mesh.skeleton.animationPropertiesOverride = new BABYLON.AnimationPropertiesOverride();
-                mesh.skeleton.animationPropertiesOverride.enableBlending = true;
-                mesh.skeleton.animationPropertiesOverride.blendingSpeed = 0.2;
-                mesh.skeleton.animationPropertiesOverride.loopMode = 1;
-                mesh.idleRange = mesh.skeleton.getAnimationRange('Idle');
-                mesh.runRange = mesh.skeleton.getAnimationRange('Run');
-                scene.beginAnimation(mesh.skeleton, mesh.idleRange.from, mesh.idleRange.to, true, 1);
-
-                mesh.KGAME_TYPE = 1;
-                player_list.push({ id: data.id, x: data.x, y: data.y, mesh: mesh, direction: data.direction, previousX: data.x, previousY: data.y });
-            });
+            create_player(data);
         }
 
         if (data.type === 'player_disconnect') {
