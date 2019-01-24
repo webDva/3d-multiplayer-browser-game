@@ -10,6 +10,7 @@ scene.clearColor = new BABYLON.Color3(1, 1, 1);
 scene.collisionsEnabled = true;
 
 const camera = new BABYLON.FollowCamera('camera', new BABYLON.Vector3(0, 0, 0), scene);
+//const camera = new BABYLON.ArcRotateCamera("Camera", 1, 1, 4, new BABYLON.Vector3(-10, 10, 20), scene);
 camera.attachControl(canvas, false);
 
 const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, -100, 0), scene);
@@ -33,7 +34,7 @@ pipeline.bloomWeight = 0.1;
 pipeline.bloomKernel = 64;
 pipeline.bloomScale = 0.5;
 
-// Ground
+// ground mesh
 const ground = BABYLON.Mesh.CreateGround("ground", 1000, 1000, 1, scene);
 ground.material = new BABYLON.GridMaterial('groundMaterial', scene);
 ground.material.mainColor = new BABYLON.Color3(1, 1, 1);
@@ -82,6 +83,15 @@ websocket.onmessage = (event) => {
             data.player_list.forEach(player_data => {
                 BABYLON.SceneLoader.ImportMeshAsync('', './', 'kawaii.babylon', scene).then(function (imported) {
                     const mesh = imported.meshes[0];
+
+                    // animation
+                    mesh.skeleton.animationPropertiesOverride = new BABYLON.AnimationPropertiesOverride();
+                    mesh.skeleton.animationPropertiesOverride.enableBlending = true;
+                    mesh.skeleton.animationPropertiesOverride.blendingSpeed = 0.2;
+                    mesh.skeleton.animationPropertiesOverride.loopMode = 1;
+                    mesh.idleRange = mesh.skeleton.getAnimationRange('Idle');
+                    scene.beginAnimation(mesh.skeleton, mesh.idleRange.from, mesh.idleRange.to, true, 1);
+
                     mesh.KGAME_TYPE = 1; // KGAME_TYPE 1 means that it is a kawaii game mesh of type 1
                     player_list.push({ id: player_data.id, x: player_data.x, y: player_data.y, mesh: mesh, direction: player_data.direction });
                     mesh.position.z = player_data.x;
@@ -90,6 +100,7 @@ websocket.onmessage = (event) => {
                     if (player_data.id === player.id) {
                         player.mesh = mesh;
                         camera.lockedTarget = player.mesh;
+                        //camera.target = player.mesh;
 
                         dummy.position.x = player.mesh.position.x;
                         dummy.position.z = player.mesh.position.z;
@@ -154,14 +165,21 @@ scene.onPointerObservable.add(pointerInfo => {
                 targetSelectionHighlightLayer.selectedMesh.selectionCircle.dispose();
                 targetSelectionHighlightLayer.removeMesh(targetSelectionHighlightLayer.selectedMesh);
             }
+            // highlight object mesh
             targetSelectionHighlightLayer.selectedMesh = player_object.mesh;
-            targetSelectionHighlightLayer.addMesh(player_object.mesh, BABYLON.Color3.Green());
+            targetSelectionHighlightLayer.addMesh(player_object.mesh, new BABYLON.Color4(1, 0, 1, 1));
+            // selection circle
             targetSelectionHighlightLayer.selectedMesh.selectionCircle = BABYLON.Mesh.CreateDisc('selectionCircle', 5, 12, scene);
             targetSelectionHighlightLayer.selectedMesh.selectionCircle.material = new BABYLON.StandardMaterial('standardmaterial', scene);
-            targetSelectionHighlightLayer.selectedMesh.selectionCircle.material.emissiveColor = new BABYLON.Color4(0, 1, 0, 1);
+            targetSelectionHighlightLayer.selectedMesh.selectionCircle.material.emissiveColor = new BABYLON.Color4(1, 0, 1, 1);
             targetSelectionHighlightLayer.selectedMesh.selectionCircle.parent = targetSelectionHighlightLayer.selectedMesh;
             targetSelectionHighlightLayer.selectedMesh.selectionCircle.position.y = 0.25;
             targetSelectionHighlightLayer.selectedMesh.selectionCircle.rotation.x = Math.PI / 2;
+            // selection circle animation
+            const selectionCircleAnimation = new BABYLON.Animation('selectionCircle', 'rotation.y', 1, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
+            selectionCircleAnimation.setKeys([{ frame: 0, value: 0 }, { frame: 10, value: 2 * Math.PI }]);
+            targetSelectionHighlightLayer.selectedMesh.selectionCircle.animations.push(selectionCircleAnimation);
+            scene.beginAnimation(targetSelectionHighlightLayer.selectedMesh.selectionCircle, 0, 10, true);
         }
 
         // remove later until add to new DOM UI attack button
@@ -233,10 +251,6 @@ scene.registerBeforeRender(function () {
         camera.position.x = player.mesh.position.x + 25;
         camera.position.y = player.mesh.position.y + 25;
         camera.position.z = player.mesh.position.z - 25;
-
-        if (targetSelectionHighlightLayer.selectedMesh) {
-            targetSelectionHighlightLayer.selectedMesh.selectionCircle.rotation.y += 0.01;
-        }
     }
 });
 
