@@ -90,10 +90,11 @@ websocket.onmessage = (event) => {
                     mesh.skeleton.animationPropertiesOverride.blendingSpeed = 0.2;
                     mesh.skeleton.animationPropertiesOverride.loopMode = 1;
                     mesh.idleRange = mesh.skeleton.getAnimationRange('Idle');
-                    scene.beginAnimation(mesh.skeleton, mesh.idleRange.from, mesh.idleRange.to, true, 1);
+                    mesh.runRange = mesh.skeleton.getAnimationRange('Run');
+                    mesh.idleRange.animation = scene.beginAnimation(mesh.skeleton, mesh.idleRange.from, mesh.idleRange.to, true, 1);
 
                     mesh.KGAME_TYPE = 1; // KGAME_TYPE 1 means that it is a kawaii game mesh of type 1
-                    player_list.push({ id: player_data.id, x: player_data.x, y: player_data.y, mesh: mesh, direction: player_data.direction });
+                    player_list.push({ id: player_data.id, x: player_data.x, y: player_data.y, mesh: mesh, direction: player_data.direction, previousX: player_data.x, previousY: player_data.y });
                     mesh.position.z = player_data.x;
                     mesh.position.x = player_data.y;
 
@@ -117,8 +118,18 @@ websocket.onmessage = (event) => {
         if (data.type === 'new_player' && session_started) {
             BABYLON.SceneLoader.ImportMeshAsync('', './', 'kawaii.babylon', scene).then(function (imported) {
                 const mesh = imported.meshes[0];
+
+                // animation
+                mesh.skeleton.animationPropertiesOverride = new BABYLON.AnimationPropertiesOverride();
+                mesh.skeleton.animationPropertiesOverride.enableBlending = true;
+                mesh.skeleton.animationPropertiesOverride.blendingSpeed = 0.2;
+                mesh.skeleton.animationPropertiesOverride.loopMode = 1;
+                mesh.idleRange = mesh.skeleton.getAnimationRange('Idle');
+                mesh.runRange = mesh.skeleton.getAnimationRange('Run');
+                mesh.idleRange.animation = scene.beginAnimation(mesh.skeleton, mesh.idleRange.from, mesh.idleRange.to, true, 1);
+
                 mesh.KGAME_TYPE = 1;
-                player_list.push({ id: data.id, x: data.x, y: data.y, mesh: mesh, direction: data.direction });
+                player_list.push({ id: data.id, x: data.x, y: data.y, mesh: mesh, direction: data.direction, previousX: data.x, previousY: data.y });
             });
         }
 
@@ -251,6 +262,39 @@ scene.registerBeforeRender(function () {
         camera.position.x = player.mesh.position.x + 25;
         camera.position.y = player.mesh.position.y + 25;
         camera.position.z = player.mesh.position.z - 25;
+
+        player_list.forEach(player_object => {
+            if (player_object.previousX != player_object.mesh.position.z || player_object.previousY != player_object.mesh.position.x) {
+                if (!player_object.mesh.runRange.isRunning) {
+
+                    player_object.mesh.runRange.isRunning = true;
+                    player_object.mesh.idleRange.isRunning = false;
+
+                    player_object.mesh.idleRange.animation.stop();
+                    player_object.mesh.runRange.animation = scene.beginAnimation(player_object.mesh.skeleton, player_object.mesh.runRange.from, player_object.mesh.runRange.to, true, 1);
+                }
+            } else {
+                if (!player_object.mesh.idleRange.isRunning) {
+
+                    player_object.mesh.idleRange.isRunning = true;
+                    player_object.mesh.runRange.isRunning = false;
+
+                    if (player_object.mesh.runRange.animation)
+                        player_object.mesh.runRange.animation.stop();
+                    player_object.mesh.idleRange.animation = scene.beginAnimation(player_object.mesh.skeleton, player_object.mesh.idleRange.from, player_object.mesh.idleRange.to, true, 1);
+                }
+            }
+
+            const deltaTime = engine.getDeltaTime();
+            const lerpFactor = 30;
+            if (deltaTime <= lerpFactor) {
+                player_object.previousX = lerp(player_object.previousX, player_object.mesh.position.z, deltaTime / lerpFactor);
+                player_object.previousY = lerp(player_object.previousY, player_object.mesh.position.x, deltaTime / lerpFactor);
+            } else {
+                player_object.previousX = player_object.mesh.position.z;
+                player_object.previousY = player_object.mesh.position.x;
+            }
+        });
     }
 });
 
