@@ -120,7 +120,7 @@ websocket.onmessage = (event) => {
             document.getElementById('attack-buttons').style.display = 'block';
         }
 
-        if (data.type === 'new_player' && session_started) {
+        if (data.type === 'new_player') {
             create_player(data);
         }
 
@@ -132,15 +132,17 @@ websocket.onmessage = (event) => {
 
     }
 
-    if (event.data instanceof ArrayBuffer && session_started) {
+    if (event.data instanceof ArrayBuffer) {
         const dataview = new DataView(event.data);
 
         if (dataview.getUint8(0) === 1) { // player orientations
             for (let i = 0; i < dataview.getUint8(1); i++) {
                 const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(2 + i * 16));
-                player_object.x = dataview.getFloat32(6 + i * 16);
-                player_object.y = dataview.getFloat32(10 + i * 16);
-                player_object.direction = dataview.getFloat32(14 + i * 16);
+                if (player_object) {
+                    player_object.x = dataview.getFloat32(6 + i * 16);
+                    player_object.y = dataview.getFloat32(10 + i * 16);
+                    player_object.direction = dataview.getFloat32(14 + i * 16);
+                }
             }
         }
 
