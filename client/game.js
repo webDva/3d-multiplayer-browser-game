@@ -80,7 +80,7 @@ function create_player(player_data, id = null) {
         mesh.skeleton.animationPropertiesOverride.loopMode = 1;
         mesh.idleRange = mesh.skeleton.getAnimationRange('Idle');
         mesh.runRange = mesh.skeleton.getAnimationRange('Run');
-        scene.beginAnimation(mesh.skeleton, mesh.idleRange.from, mesh.idleRange.to, true, 1);
+        mesh.idleRange.animation = scene.beginAnimation(mesh.skeleton, mesh.idleRange.from, mesh.idleRange.to, true, 1);
 
         mesh.KGAME_TYPE = 1; // KGAME_TYPE 1 means that it is a kawaii game mesh of type 1
         player_list.push({ id: player_data.id, x: player_data.x, y: player_data.y, mesh: mesh, direction: player_data.direction, previousX: player_data.x, previousY: player_data.y });
@@ -260,13 +260,16 @@ scene.registerBeforeRender(function () {
                 if (!player_object.mesh.runRange.isRunning) {
                     player_object.mesh.runRange.isRunning = true;
                     player_object.mesh.idleRange.isRunning = false;
-                    scene.beginAnimation(player_object.mesh.skeleton, player_object.mesh.runRange.from, player_object.mesh.runRange.to, true, 1);
+                    player_object.mesh.idleRange.animation.stop();
+                    player_object.mesh.runRange.animation = scene.beginAnimation(player_object.mesh.skeleton, player_object.mesh.runRange.from, player_object.mesh.runRange.to, true, 1);
                 }
             } else {
                 if (!player_object.mesh.idleRange.isRunning) {
                     player_object.mesh.idleRange.isRunning = true;
                     player_object.mesh.runRange.isRunning = false;
-                    scene.beginAnimation(player_object.mesh.skeleton, player_object.mesh.idleRange.from, player_object.mesh.idleRange.to, true, 1);
+                    if (player_object.mesh.runRange.animation)
+                        player_object.mesh.runRange.animation.stop();
+                    player_object.mesh.idleRange.animation = scene.beginAnimation(player_object.mesh.skeleton, player_object.mesh.idleRange.from, player_object.mesh.idleRange.to, true, 1);
                 }
             }
 
