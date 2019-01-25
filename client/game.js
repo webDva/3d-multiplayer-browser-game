@@ -70,7 +70,7 @@ let player_list = [];
 let session_started = false;
 
 function create_player(player_data, id = null) {
-    BABYLON.SceneLoader.ImportMeshAsync('', './', 'kawaii.babylon', scene).then(function (imported) {
+    BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'kawaii.babylon', scene).then(function (imported) {
         const mesh = imported.meshes[0];
 
         // animation
@@ -117,7 +117,7 @@ websocket.onmessage = (event) => {
             });
 
             // display DOM user interface
-            document.getElementById('attack-buttons').style.display = 'block';
+            document.getElementById('attack-buttons-container').style.display = 'flex';
         }
 
         if (data.type === 'new_player') {
