@@ -76,8 +76,7 @@ ws_server.on('connection', (websocket) => {
                 const player = websocket.player;
                 const target = client_dataview.getUint32(1); // player ID or mob ID
                 const attack = client_dataview.getUint8(5); // attack type or ID, an unsigned byte
-                // for now, just log
-                console.log(`Player ${player.id} attacked target ${target} with attack ${attack}`);
+                game.combat.attacks.push({ attacker: player.id, target: target, attack: attack });
             }
         }
     });
@@ -100,6 +99,16 @@ class Game {
     constructor() {
         this.players = [];
         this.mapSize = 25; // width and height
+        this.networkUpdates = {
+            combat: {
+                attacks: [],
+                deaths: [],
+                respawns: [] // or joins
+            }
+        };
+        this.combat = {
+            attacks: []
+        };
     }
 
     addPlayer() {
@@ -185,6 +194,12 @@ class Game {
                         client.send(dataview);
                 });
             });
+
+        // combat attacks
+        this.combat.attacks.forEach(attack => {
+            this.networkUpdates.combat.attacks.push(attack);
+            this.combat.attacks.splice(this.combat.attacks.indexOf(attack), 1);
+        });
     }
 
     sendNetworkUpdates() {
@@ -204,6 +219,20 @@ class Game {
         ws_server.clients.forEach(client => {
             if (client.readyState === WebSocket.OPEN)
                 client.send(dataview);
+        });
+
+        this.networkUpdates.combat.attacks.forEach(attack => {
+            arraybuffer = new ArrayBuffer(1 + 4 + 4 + 1);
+            dataview = new DataView(arraybuffer);
+            dataview.setUint8(0, 2);
+            dataview.setUint32(1, attack.attacker);
+            dataview.setUint32(5, attack.target);
+            dataview.setUint8(9, attack.attack);
+            ws_server.clients.forEach(client => {
+                if (client.readyState === WebSocket.OPEN)
+                    client.send(dataview);
+            });
+            this.networkUpdates.combat.attacks.splice(this.networkUpdates.combat.attacks.indexOf(attack), 1);
         });
     }
 }

@@ -51,6 +51,27 @@ const dummy = BABYLON.MeshBuilder.CreateBox("box", {}, scene);
 dummy.position.y = 1;
 dummy.material = new BABYLON.StandardMaterial("standardmaterial", scene);
 
+// attack animation particle system
+const attack1Particles = new BABYLON.ParticleSystem("attack1_particles", 17000, scene);
+attack1Particles.particleTexture = new BABYLON.Texture("/assets/particle_texture2.png", scene);
+attack1Particles.color1 = new BABYLON.Color4(0.5, 0.2, 0.9, 1.0);
+attack1Particles.color2 = new BABYLON.Color4(0.3, 0.4, 0.4, 1.0);
+attack1Particles.colorDead = new BABYLON.Color4(0, 0, 0, 0);
+attack1Particles.minSize = 0.1;
+attack1Particles.maxSize = 0.5;
+attack1Particles.minLifeTime = 0.3;
+attack1Particles.maxLifeTime = 2.5;
+// Emission rate
+attack1Particles.emitRate = 3000;
+// Blend mode : BLENDMODE_ONEONE, or BLENDMODE_STANDARD
+attack1Particles.blendMode = BABYLON.ParticleSystem.BLENDMODE_STANDARD;
+// Set the gravity of all particles
+attack1Particles.gravity = new BABYLON.Vector3(0, 9.81, 0);
+// Speed
+attack1Particles.minEmitPower = 5;
+attack1Particles.maxEmitPower = 50;
+attack1Particles.updateSpeed = 0.005;
+
 const player = {
     id: null,
     mesh: null,
@@ -68,6 +89,7 @@ const player = {
 };
 let player_list = [];
 let session_started = false;
+let attacker, target, isParticlesStarted = false;
 
 function create_player(player_data, id = null) {
     BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'kawaii.babylon', scene).then(function (imported) {
@@ -100,6 +122,13 @@ function create_player(player_data, id = null) {
         }
     });
 }
+
+const attack1 = document.getElementById('attack-1');
+attack1.onclick = function () {
+    if (player.combat.target) {
+        player.combat.attack = 1;
+    }
+};
 
 // configure WebSocket client
 
@@ -146,6 +175,15 @@ websocket.onmessage = (event) => {
             }
         }
 
+        if (dataview.getUint8(0) === 2) { // attacks
+            attacker = player_list.find(player_object => player_object.id === dataview.getUint32(1));
+            target = player_list.find(player_object => player_object.id === dataview.getUint32(5));
+            attack1Particles.emitter = new BABYLON.Vector3(attacker.mesh.position.x, 5, attacker.mesh.position.z);
+            attack1Particles.createPointEmitter(new BABYLON.Vector3(-7, 8, 3), new BABYLON.Vector3(7, 8, -3));
+            isParticlesStarted = true;
+            attack1Particles.start();
+        }
+
         // no player deaths for now
 
         // no player respawns either
@@ -164,11 +202,13 @@ scene.onPointerObservable.add(pointerInfo => {
             targetSelectionHighlightLayer.removeMesh(targetSelectionHighlightLayer.selectedMesh);
             targetSelectionHighlightLayer.selectedMesh.selectionCircle.dispose();
             targetSelectionHighlightLayer.selectedMesh = null;
+            player.combat.target = null;
         } else {
             if (targetSelectionHighlightLayer.selectedMesh) { // remove previous highlight and selection circle underneath
                 targetSelectionHighlightLayer.selectedMesh.selectionCircle.dispose();
                 targetSelectionHighlightLayer.removeMesh(targetSelectionHighlightLayer.selectedMesh);
             }
+            player.combat.target = player_object.id;
             // highlight object mesh
             targetSelectionHighlightLayer.selectedMesh = player_object.mesh;
             targetSelectionHighlightLayer.addMesh(player_object.mesh, new BABYLON.Color4(1, 0, 1, 1));
@@ -185,10 +225,6 @@ scene.onPointerObservable.add(pointerInfo => {
             targetSelectionHighlightLayer.selectedMesh.selectionCircle.animations.push(selectionCircleAnimation);
             scene.beginAnimation(targetSelectionHighlightLayer.selectedMesh.selectionCircle, 0, 10, true);
         }
-
-        // remove later until add to new DOM UI attack button
-        // player.combat.target = player_object.id;
-        // player.combat.attack = 100;
     } else if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN && pointerInfo.pickInfo.pickedMesh === ground) {
         player.movement.isMoving = true;
         player.movement.x = pointerInfo.pickInfo.pickedPoint.z;
@@ -283,6 +319,23 @@ scene.registerBeforeRender(function () {
             } else {
                 player_object.previousX = player_object.mesh.position.z;
                 player_object.previousY = player_object.mesh.position.x;
+            }
+
+            const particleTime = 2500;
+            const threshold = 5;
+            if (isParticlesStarted) {
+                if (Math.abs(attack1Particles.emitter.z - target.mesh.position.z) >= threshold || Math.abs(attack1Particles.emitter.x - target.mesh.position.x) >= threshold) {
+                    if (deltaTime <= particleTime) {
+                        attack1Particles.emitter.z = lerp(attack1Particles.emitter.z, target.mesh.position.z, deltaTime / particleTime);
+                        attack1Particles.emitter.x = lerp(attack1Particles.emitter.x, target.mesh.position.x, deltaTime / particleTime);
+                    } else {
+                        attack1Particles.emitter.z = target.mesh.position.z;
+                        attack1Particles.emitter.x = target.mesh.position.x;
+                    }
+                } else {
+                    isParticlesStarted = false;
+                    attack1Particles.stop();
+                }
             }
         });
     }
