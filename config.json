@@ -7,10 +7,5 @@
         "collisionWidth": 32,
         "collisionHeight": 32
     },
-    "projectile": {
-        "defaultLifetime": 3000,
-        "defaultMovementSpeed": 10,
-        "defaultWidth": 10,
-        "defaultHeight": 10
-    }
+    "mapSize": 25
 }

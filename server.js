@@ -15,6 +15,13 @@ httpServer.listen(PORT, function () {
     console.log('listening on port ' + PORT);
 });
 
+function notify_all_clients(data, exception = null) {
+    ws_server.clients.forEach(client => {
+        if (client !== exception && client.readyState === WebSocket.OPEN)
+            client.send(data);
+    });
+}
+
 ws_server.on('connection', (websocket) => {
     websocket.binaryType = 'arraybuffer';
     websocket.isAlive = true; // create this property for the sake of implementing ping-pong heartbeats
@@ -43,16 +50,13 @@ ws_server.on('connection', (websocket) => {
                     player_list: players_list
                 }));
                 // notify the rest of the room of the new player
-                ws_server.clients.forEach(client => {
-                    if (client !== websocket && client.readyState === WebSocket.OPEN)
-                        client.send(JSON.stringify({
-                            type: 'new_player',
-                            id: websocket.player.id,
-                            x: websocket.player.x,
-                            y: websocket.player.y,
-                            direction: websocket.player.direction
-                        }));
-                });
+                notify_all_clients(JSON.stringify({
+                    type: 'new_player',
+                    id: websocket.player.id,
+                    x: websocket.player.x,
+                    y: websocket.player.y,
+                    direction: websocket.player.direction
+                }), websocket);
             }
         }
 
@@ -83,13 +87,10 @@ ws_server.on('connection', (websocket) => {
 
     websocket.on('close', () => {
         game.players.splice(game.players.indexOf(websocket.player), 1);
-        ws_server.clients.forEach(client => {
-            if (client !== websocket && client.readyState === WebSocket.OPEN)
-                client.send(JSON.stringify({
-                    type: 'player_disconnect',
-                    id: websocket.player.id
-                }));
-        });
+        notify_all_clients(JSON.stringify({
+            type: 'player_disconnect',
+            id: websocket.player.id
+        }), websocket);
     });
 
     websocket.on('pong', () => websocket.isAlive = true);
@@ -98,7 +99,7 @@ ws_server.on('connection', (websocket) => {
 class Game {
     constructor() {
         this.players = [];
-        this.mapSize = 25; // width and height
+        this.mapSize = config.mapSize; // width and height
         this.networkUpdates = {
             combat: {
                 attacks: [],
@@ -216,10 +217,7 @@ class Game {
             dataview.setFloat32(10 + index * 16, player.y);
             dataview.setFloat32(14 + index * 16, player.direction);
         });
-        ws_server.clients.forEach(client => {
-            if (client.readyState === WebSocket.OPEN)
-                client.send(dataview);
-        });
+        notify_all_clients(dataview);
 
         this.networkUpdates.combat.attacks.forEach(attack => {
             arraybuffer = new ArrayBuffer(1 + 4 + 4 + 1);
@@ -228,10 +226,7 @@ class Game {
             dataview.setUint32(1, attack.attacker);
             dataview.setUint32(5, attack.target);
             dataview.setUint8(9, attack.attack);
-            ws_server.clients.forEach(client => {
-                if (client.readyState === WebSocket.OPEN)
-                    client.send(dataview);
-            });
+            notify_all_clients(dataview);
             this.networkUpdates.combat.attacks.splice(this.networkUpdates.combat.attacks.indexOf(attack), 1);
         });
     }
@@ -254,13 +249,10 @@ setInterval(() => {
     ws_server.clients.forEach(websocket => {
         if (websocket.isAlive === false) {
             game.players.splice(game.players.indexOf(websocket.player), 1);
-            ws_server.clients.forEach(client => {
-                if (client !== websocket && client.readyState === WebSocket.OPEN)
-                    client.send(JSON.stringify({
-                        type: 'player_disconnect',
-                        id: websocket.player.id
-                    }));
-            });
+            notify_all_clients(JSON.stringify({
+                type: 'player_disconnect',
+                id: websocket.player.id
+            }), websocket);
             return websocket.terminate();
         }
 
