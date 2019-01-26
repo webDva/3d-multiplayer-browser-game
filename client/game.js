@@ -51,26 +51,40 @@ const dummy = BABYLON.MeshBuilder.CreateBox("box", {}, scene);
 dummy.position.y = 1;
 dummy.material = new BABYLON.StandardMaterial("standardmaterial", scene);
 
-// attack animation particle system
-const attack1Particles = new BABYLON.ParticleSystem("attack1_particles", 17000, scene);
-attack1Particles.particleTexture = new BABYLON.Texture("/assets/particle_texture2.png", scene);
-attack1Particles.color1 = new BABYLON.Color4(0.5, 0.2, 0.9, 1.0);
-attack1Particles.color2 = new BABYLON.Color4(0.3, 0.4, 0.4, 1.0);
-attack1Particles.colorDead = new BABYLON.Color4(0, 0, 0, 0);
-attack1Particles.minSize = 0.1;
-attack1Particles.maxSize = 0.5;
-attack1Particles.minLifeTime = 0.3;
-attack1Particles.maxLifeTime = 2.5;
-// Emission rate
-attack1Particles.emitRate = 3000;
-// Blend mode : BLENDMODE_ONEONE, or BLENDMODE_STANDARD
-attack1Particles.blendMode = BABYLON.ParticleSystem.BLENDMODE_STANDARD;
-// Set the gravity of all particles
-attack1Particles.gravity = new BABYLON.Vector3(0, 9.81, 0);
-// Speed
-attack1Particles.minEmitPower = 5;
-attack1Particles.maxEmitPower = 50;
-attack1Particles.updateSpeed = 0.005;
+// particle system handling subsystem
+let particles = [];
+function create_particles(config, sourceMesh, height = 5) { // config is a particle system configuration object
+    const particleSystem = new BABYLON.ParticleSystem('', config.number, scene);
+
+    // particle system configuration
+    particleSystem.particleTexture = new BABYLON.Texture(config.particleTexture, scene);
+    particleSystem.color1 = config.color1;
+    particleSystem.color2 = config.color2;
+    particleSystem.colorDead = config.colorDead;
+    particleSystem.minSize = config.minSize;
+    particleSystem.maxSize = config.maxSize;
+    particleSystem.minLifeTime = config.minLifeTime;
+    particleSystem.maxLifeTime = config.maxLifeTime;
+    particleSystem.emitRate = config.emitRate;
+    particleSystem.blendMode = config.blendMode;
+    particleSystem.gravity = config.gravity;
+    particleSystem.minEmitPower = config.minEmitPower;
+    particleSystem.maxEmitPower = config.maxEmitPower;
+    particleSystem.updateSpeed = config.updateSpeed;
+
+    particleSystem.emitter = new BABYLON.Vector3(sourceMesh.position.x, height, sourceMesh.position.z);
+
+    // will need to change for different types of particle effects
+    particleSystem.createSphereEmitter(1.2);
+
+    particleSystem.start();
+
+    // meta
+    particleSystem.movementSpeed = config.movementSpeed;
+    particleSystem.threshold = config.threshold;
+
+    return particleSystem;
+}
 
 const player = {
     id: null,
@@ -178,10 +192,10 @@ websocket.onmessage = (event) => {
         if (dataview.getUint8(0) === 2) { // attacks
             attacker = player_list.find(player_object => player_object.id === dataview.getUint32(1));
             target = player_list.find(player_object => player_object.id === dataview.getUint32(5));
-            attack1Particles.emitter = new BABYLON.Vector3(attacker.mesh.position.x, 5, attacker.mesh.position.z);
-            attack1Particles.createPointEmitter(new BABYLON.Vector3(-7, 8, 3), new BABYLON.Vector3(7, 8, -3));
-            isParticlesStarted = true;
-            attack1Particles.start();
+
+            // attack 1 for now
+            const particleSystem = create_particles(ParticlesConfiguration.Attack1Particles, attacker.mesh);
+            particles.push({ system: particleSystem, target: target });
         }
 
         // no player deaths for now
@@ -321,22 +335,21 @@ scene.registerBeforeRender(function () {
                 player_object.previousY = player_object.mesh.position.x;
             }
 
-            const particleTime = 2500;
-            const threshold = 5;
-            if (isParticlesStarted) {
-                if (Math.abs(attack1Particles.emitter.z - target.mesh.position.z) >= threshold || Math.abs(attack1Particles.emitter.x - target.mesh.position.x) >= threshold) {
-                    if (deltaTime <= particleTime) {
-                        attack1Particles.emitter.z = lerp(attack1Particles.emitter.z, target.mesh.position.z, deltaTime / particleTime);
-                        attack1Particles.emitter.x = lerp(attack1Particles.emitter.x, target.mesh.position.x, deltaTime / particleTime);
-                    } else {
-                        attack1Particles.emitter.z = target.mesh.position.z;
-                        attack1Particles.emitter.x = target.mesh.position.x;
-                    }
-                } else {
-                    isParticlesStarted = false;
-                    attack1Particles.stop();
+            particles.forEach(particleSystem => {
+                if (!particleSystem.target) { // player disconnects before particle system is disposed
+                    particleSystem.system.stop();
+                    particles.splice(particles.indexOf(particleSystem), 1);
+                    return;
                 }
-            }
+                if (Math.abs(particleSystem.system.emitter.z - particleSystem.target.mesh.position.z) >= particleSystem.system.threshold || Math.abs(particleSystem.system.emitter.x - particleSystem.target.mesh.position.x) >= particleSystem.system.threshold) {
+                    const direction = Math.atan2(particleSystem.target.mesh.position.x - particleSystem.system.emitter.x, particleSystem.target.mesh.position.z - particleSystem.system.emitter.z);
+                    particleSystem.system.emitter.z += Math.cos(direction) * particleSystem.system.movementSpeed;
+                    particleSystem.system.emitter.x += Math.sin(direction) * particleSystem.system.movementSpeed;
+                } else {
+                    particleSystem.system.stop();
+                    particles.splice(particles.indexOf(particleSystem), 1);
+                }
+            });
         });
     }
 });
