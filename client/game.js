@@ -53,7 +53,7 @@ dummy.material = new BABYLON.StandardMaterial("standardmaterial", scene);
 
 // particle system handling subsystem
 let particles = [];
-function create_particles(config, sourceMesh, height = 5) { // config is a particle system configuration object
+function create_particles(config, sourceMesh = null, targetMesh = null) { // config is a particle system configuration object
     const particleSystem = new BABYLON.ParticleSystem('', config.number, scene);
 
     // particle system configuration
@@ -72,16 +72,21 @@ function create_particles(config, sourceMesh, height = 5) { // config is a parti
     particleSystem.maxEmitPower = config.maxEmitPower;
     particleSystem.updateSpeed = config.updateSpeed;
 
-    particleSystem.emitter = new BABYLON.Vector3(sourceMesh.position.x, height, sourceMesh.position.z);
-
-    // will need to change for different types of particle effects
-    particleSystem.createSphereEmitter(1.2);
+    switch (config.type) {
+        case 'Attack1':
+            particleSystem.emitter = new BABYLON.Vector3(sourceMesh.position.x, config.height, sourceMesh.position.z);
+            particleSystem.createSphereEmitter(config.sphereEmitterRadius);
+            particleSystem.movementSpeed = config.movementSpeed;
+            particleSystem.threshold = config.threshold;
+            break;
+        case 'Attack2':
+            particleSystem.emitter = new BABYLON.Vector3(targetMesh.position.x, config.height, targetMesh.position.z);
+            const hemisphericEmitter = particleSystem.createHemisphericEmitter(config.circleRadius);
+            hemisphericEmitter.radiusRange = 1;
+            break;
+    }
 
     particleSystem.start();
-
-    // meta
-    particleSystem.movementSpeed = config.movementSpeed;
-    particleSystem.threshold = config.threshold;
 
     return particleSystem;
 }
@@ -144,6 +149,13 @@ attack1.onclick = function () {
     }
 };
 
+const attack2 = document.getElementById('attack-2');
+attack2.onclick = function () {
+    if (player.combat.target) {
+        player.combat.attack = 2;
+    }
+}
+
 // configure WebSocket client
 
 const websocket = new WebSocket(((window.location.protocol === 'https:') ? 'wss://' : 'ws://') + window.location.host);
@@ -192,10 +204,13 @@ websocket.onmessage = (event) => {
         if (dataview.getUint8(0) === 2) { // attacks
             attacker = player_list.find(player_object => player_object.id === dataview.getUint32(1));
             target = player_list.find(player_object => player_object.id === dataview.getUint32(5));
-
-            // attack 1 for now
-            const particleSystem = create_particles(ParticlesConfiguration.Attack1Particles, attacker.mesh);
-            particles.push({ system: particleSystem, target: target });
+            if (dataview.getUint8(9) === 1) {
+                const particleSystem = create_particles(ParticlesConfiguration.Attack1Particles, attacker.mesh);
+                particles.push({ system: particleSystem, target: target, type: 'Attack1' });
+            } else if (dataview.getUint8(9) === 2) {
+                const particleSystem = create_particles(ParticlesConfiguration.Attack2Particles, null, target.mesh);
+                particles.push({ system: particleSystem, type: 'Attack2', time: Date.now() });
+            }
         }
 
         // no player deaths for now
@@ -336,18 +351,25 @@ scene.registerBeforeRender(function () {
             }
 
             particles.forEach(particleSystem => {
-                if (!particleSystem.target) { // player disconnects before particle system is disposed
-                    particleSystem.system.stop();
-                    particles.splice(particles.indexOf(particleSystem), 1);
-                    return;
-                }
-                if (Math.abs(particleSystem.system.emitter.z - particleSystem.target.mesh.position.z) >= particleSystem.system.threshold || Math.abs(particleSystem.system.emitter.x - particleSystem.target.mesh.position.x) >= particleSystem.system.threshold) {
-                    const direction = Math.atan2(particleSystem.target.mesh.position.x - particleSystem.system.emitter.x, particleSystem.target.mesh.position.z - particleSystem.system.emitter.z);
-                    particleSystem.system.emitter.z += Math.cos(direction) * particleSystem.system.movementSpeed;
-                    particleSystem.system.emitter.x += Math.sin(direction) * particleSystem.system.movementSpeed;
-                } else {
-                    particleSystem.system.stop();
-                    particles.splice(particles.indexOf(particleSystem), 1);
+                if (particleSystem.type === 'Attack1') {
+                    if (!particleSystem.target) { // player disconnects before particle system is disposed
+                        particleSystem.system.stop();
+                        particles.splice(particles.indexOf(particleSystem), 1);
+                        return;
+                    }
+                    if (Math.abs(particleSystem.system.emitter.z - particleSystem.target.mesh.position.z) >= particleSystem.system.threshold || Math.abs(particleSystem.system.emitter.x - particleSystem.target.mesh.position.x) >= particleSystem.system.threshold) {
+                        const direction = Math.atan2(particleSystem.target.mesh.position.x - particleSystem.system.emitter.x, particleSystem.target.mesh.position.z - particleSystem.system.emitter.z);
+                        particleSystem.system.emitter.z += Math.cos(direction) * particleSystem.system.movementSpeed;
+                        particleSystem.system.emitter.x += Math.sin(direction) * particleSystem.system.movementSpeed;
+                    } else {
+                        particleSystem.system.stop();
+                        particles.splice(particles.indexOf(particleSystem), 1);
+                    }
+                } else if (particleSystem.type === 'Attack2') {
+                    if (Date.now() - particleSystem.time >= ParticlesConfiguration.Attack2Particles.ttl) {
+                        particleSystem.system.stop();
+                        particles.splice(particles.indexOf(particleSystem), 1);
+                    }
                 }
             });
         });
