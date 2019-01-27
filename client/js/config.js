@@ -42,7 +42,7 @@ const ParticlesConfiguration = {
 
         // meta
         type: 'Attack2',
-        height: 30, // how high above the target mesh
+        height: 20, // how high above the target mesh
         ttl: 2300, // time to live for the entire particle effect in milliseconds
         circleRadius: 25 // for the 2D circle above the target's head
     }

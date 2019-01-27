@@ -18,22 +18,6 @@ light.diffuse = new BABYLON.Color3(1, 1, 1);
 light.specular = new BABYLON.Color3(0, 0, 0);
 light.groundColor = new BABYLON.Color3(0, 0, 0);
 
-scene.fogMode = BABYLON.Scene.FOGMODE_LINEAR;
-scene.fogStart = 50;
-scene.fogEnd = 100;
-scene.fogColor = new BABYLON.Color3(0.9, 0.8, 0.9);
-
-const pipeline = new BABYLON.DefaultRenderingPipeline("default", true, scene, [scene.activeCamera]);
-
-pipeline.samples = 4;
-pipeline.fxaaEnabled = true;
-
-pipeline.bloomEnabled = true;
-pipeline.bloomThreshold = 0.8;
-pipeline.bloomWeight = 0.1;
-pipeline.bloomKernel = 64;
-pipeline.bloomScale = 0.5;
-
 // ground mesh
 const ground = BABYLON.Mesh.CreateGround("ground", 1000, 1000, 1, scene);
 ground.material = new BABYLON.GridMaterial('groundMaterial', scene);
@@ -45,11 +29,6 @@ ground.checkCollisions = true;
 
 // highlight layer for highlighting meshes
 const targetSelectionHighlightLayer = new BABYLON.HighlightLayer("highlightlayer", scene);
-
-// dummy mesh
-const dummy = BABYLON.MeshBuilder.CreateBox("box", {}, scene);
-dummy.position.y = 1;
-dummy.material = new BABYLON.StandardMaterial("standardmaterial", scene);
 
 // particle system handling subsystem
 let particles = [];
@@ -133,9 +112,6 @@ function create_player(player_data, id = null) {
             player.mesh = mesh;
             camera.lockedTarget = player.mesh;
             //camera.target = player.mesh;
-
-            dummy.position.x = player.mesh.position.x;
-            dummy.position.z = player.mesh.position.z;
 
             session_started = true;
         }
