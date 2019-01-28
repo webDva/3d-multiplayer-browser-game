@@ -234,6 +234,22 @@ scene.onPointerObservable.add(pointerInfo => {
         player.movement.isMoving = true;
         player.movement.x = pointerInfo.pickInfo.pickedPoint.z;
         player.movement.y = pointerInfo.pickInfo.pickedPoint.x;
+        // destination circle
+        const destinationCircle = BABYLON.Mesh.CreateDisc('destinationCircle', 0, 32, scene);
+        destinationCircle.material = new BABYLON.StandardMaterial('standardmaterial', scene);
+        destinationCircle.material.emissiveColor = new BABYLON.Color3(0.5, 0.5, 0.5);
+        destinationCircle.position = new BABYLON.Vector3(player.movement.y, 0.25, player.movement.x);
+        destinationCircle.rotation.x = Math.PI / 2;
+        // animation for the destination circle
+        const destinationCircleAnimation = new BABYLON.Animation('destinationCircleAnimation', 'scaling', 300, BABYLON.Animation.ANIMATIONTYPE_VECTOR3, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
+        destinationCircleAnimation.setKeys([{ frame: 0, value: new BABYLON.Vector3(0, 0, 0) }, { frame: 50, value: new BABYLON.Vector3(3, 3, 3) }, { frame: 100, value: new BABYLON.Vector3(0, 0, 0) }]);
+        const destinationCircleEasingFunction = new BABYLON.BounceEase(10, 20);
+        destinationCircleEasingFunction.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
+        destinationCircleAnimation.setEasingFunction(destinationCircleEasingFunction);
+        destinationCircle.animations.push(destinationCircleAnimation);
+        scene.beginAnimation(destinationCircle, 100, 0, false, 1, function () {
+            destinationCircle.dispose();
+        });
     }
 });
 
