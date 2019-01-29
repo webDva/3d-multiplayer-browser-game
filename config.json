@@ -4,8 +4,7 @@
     "physicsTickRate": 30,
     "player": {
         "defaultMovementSpeed": 1,
-        "collisionWidth": 3,
-        "collisionHeight": 3
+        "radius": 3
     },
     "mapSize": 25
 }

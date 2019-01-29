@@ -116,16 +116,12 @@ class Game {
             attacks: []
         };
 
-        // spawn ten spell attack 1 consumables
+        // spawn spell attack 1 consumables
         this.spells = [];
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 100; i++) {
             this.spells.push({
                 x: Math.floor(Math.random() * (this.mapSize + 1)),
                 y: Math.floor(Math.random() * (this.mapSize + 1)),
-
-                //collision
-                width: 3,
-                height: 3,
 
                 attackNumber: 1,
                 id: i // for now
@@ -147,8 +143,7 @@ class Game {
             movement_speed: config.player.defaultMovementSpeed,
 
             // collision
-            width: config.player.collisionWidth,
-            height: config.player.collisionHeight,
+            radius: config.player.radius,
 
             direction: 0, // direction for attacking and avatar facing, in radians
 
@@ -224,7 +219,7 @@ class Game {
             // is this legal checks would need to be performed here
 
             this.spells.forEach(spell => {
-                if (this.isColliding(player, spell)) {
+                if (this.pointCircleCollision(spell, player)) {
                     const player_spell = player.spells.find(s => s.attackNumber === spell.attackNumber);
                     if (player_spell) {
                         player_spell.amount++;
@@ -276,11 +271,8 @@ class Game {
         });
     }
 
-    isColliding(object1, object2) {
-        if (object1.x < object2.x + object2.width &&
-            object1.x + object1.width > object2.x &&
-            object1.y < object2.y + object2.height &&
-            object1.y + object1.height > object2.y) {
+    pointCircleCollision(point, circle) {
+        if (Math.sqrt(Math.pow(point.x - circle.x, 2) + Math.pow(point.y - circle.y, 2)) <= circle.radius) {
             return true;
         } else {
             return false;

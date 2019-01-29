@@ -49,7 +49,12 @@ html, body {
 }
 
 .counter {
-    
+    float: right;
+    margin: 0 auto;
+}
+
+.attack-text {
+    margin: 10px auto;
 }
 
 @media (max-width: 750px) {

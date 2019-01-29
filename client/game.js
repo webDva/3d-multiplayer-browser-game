@@ -20,6 +20,7 @@ light.groundColor = new BABYLON.Color3(0, 0, 0);
 
 // ground mesh
 const ground = BABYLON.Mesh.CreateGround("ground", 1000, 1000, 1, scene);
+ground.KGAME_TYPE = 2; // 2 means that it can be navigated to
 ground.material = new BABYLON.GridMaterial('groundMaterial', scene);
 ground.material.mainColor = new BABYLON.Color3(1, 1, 1);
 ground.material.lineColor = new BABYLON.Color3(0, 0, 0);
@@ -157,9 +158,10 @@ websocket.onmessage = (event) => {
 
             data.spells.forEach(spell => {
                 const spell_consumable = BABYLON.MeshBuilder.CreateSphere('sphere', { diameter: 1 }, scene);
-                spell_consumable.position = new BABYLON.Vector3(spell.x, 1, spell.y);
+                spell_consumable.KGAME_TYPE = 2;
+                spell_consumable.position = new BABYLON.Vector3(spell.y, 1, spell.x);
                 spell_consumable.material = new BABYLON.StandardMaterial('standardMaterial', scene);
-                spell_consumable.material.emissiveColor = new BABYLON.Color4(0, 0, 1, 1);
+                spell_consumable.material.emissiveColor = new BABYLON.Color4(0, 0, spell.attackNumber / 1, 1);
                 spell_consumables.push({ mesh: spell_consumable, id: spell.id });
             });
 
@@ -265,7 +267,7 @@ scene.onPointerObservable.add(pointerInfo => {
             targetSelectionHighlightLayer.selectedMesh.selectionCircle.animations.push(selectionCircleAnimation);
             scene.beginAnimation(targetSelectionHighlightLayer.selectedMesh.selectionCircle, 0, 10, true);
         }
-    } else if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN && pointerInfo.pickInfo.pickedMesh === ground) {
+    } else if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN && pointerInfo.pickInfo.pickedMesh.KGAME_TYPE === 2) {
         player.movement.isMoving = true;
         player.movement.x = pointerInfo.pickInfo.pickedPoint.z;
         player.movement.y = pointerInfo.pickInfo.pickedPoint.x;
