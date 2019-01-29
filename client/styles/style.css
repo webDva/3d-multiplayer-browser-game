@@ -48,6 +48,10 @@ html, body {
     border-color: palevioletred;
 }
 
+.counter {
+    
+}
+
 @media (max-width: 750px) {
     .attack-button {
         font-size: 12px;

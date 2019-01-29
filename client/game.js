@@ -83,11 +83,15 @@ const player = {
     combat: {
         target: null,
         attack: null
-    }
+    },
+
+    spells: []
 };
 let player_list = [];
 let session_started = false;
 let attacker, target, isParticlesStarted = false;
+
+let spell_consumables = [];
 
 function create_player(player_data, id = null) {
     BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'kawaii.babylon', scene).then(function (imported) {
@@ -120,8 +124,12 @@ function create_player(player_data, id = null) {
 
 const attack1 = document.getElementById('attack-1');
 attack1.onclick = function () {
-    if (player.combat.target) {
+    const consumed_spell = player.spells.find(spell => spell.attackNumber === 1);
+    if (player.combat.target && consumed_spell) {
         player.combat.attack = 1;
+        consumed_spell.amount--;
+        const counter = document.getElementById('counter-1');
+        counter.innerText = consumed_spell.amount;
     }
 };
 
@@ -147,12 +155,39 @@ websocket.onmessage = (event) => {
                 create_player(player_data, player.id);
             });
 
+            data.spells.forEach(spell => {
+                const spell_consumable = BABYLON.MeshBuilder.CreateSphere('sphere', { diameter: 1 }, scene);
+                spell_consumable.position = new BABYLON.Vector3(spell.x, 1, spell.y);
+                spell_consumable.material = new BABYLON.StandardMaterial('standardMaterial', scene);
+                spell_consumable.material.emissiveColor = new BABYLON.Color4(0, 0, 1, 1);
+                spell_consumables.push({ mesh: spell_consumable, id: spell.id });
+            });
+
             // display DOM user interface
             document.getElementById('attack-buttons-container').style.display = 'flex';
         }
 
         if (data.type === 'new_player') {
             create_player(data);
+        }
+
+        if (data.type === 'new_spell') {
+            const attackNumber = data.attackNumber;
+            const existingSpell = player.spells.find(spell_object => spell_object.attackNumber === attackNumber);
+            const counter = document.getElementById('counter-1');
+            if (!existingSpell) {
+                player.spells.push({ attackNumber: attackNumber, amount: 1 });
+                counter.innerText = 1;
+            } else {
+                existingSpell.amount++;
+                counter.innerText = existingSpell.amount;
+            }
+        }
+
+        if (data.type === 'spell_collected') {
+            const findSpell = spell_consumables.find(spell => spell.id === data.id);
+            findSpell.mesh.dispose();
+            spell_consumables.splice(spell_consumables.indexOf(findSpell), 1);
         }
 
         if (data.type === 'player_disconnect') {

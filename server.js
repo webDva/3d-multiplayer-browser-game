@@ -47,7 +47,8 @@ ws_server.on('connection', (websocket) => {
                 websocket.send(JSON.stringify({
                     type: 'welcome',
                     id: websocket.player.id,
-                    player_list: players_list
+                    player_list: players_list,
+                    spells: game.spells
                 }));
                 // notify the rest of the room of the new player
                 notify_all_clients(JSON.stringify({
@@ -80,7 +81,11 @@ ws_server.on('connection', (websocket) => {
                 const player = websocket.player;
                 const target = client_dataview.getUint32(1); // player ID or mob ID
                 const attack = client_dataview.getUint8(5); // attack type or ID, an unsigned byte
-                game.combat.attacks.push({ attacker: player.id, target: target, attack: attack });
+                const player_spell = player.spells.find(spell => spell.attackNumber === attack);
+                if (player_spell.amount > 0) {
+                    player_spell.amount--;
+                    game.combat.attacks.push({ attacker: player.id, target: target, attack: attack });
+                }
             }
         }
     });
@@ -110,6 +115,22 @@ class Game {
         this.combat = {
             attacks: []
         };
+
+        // spawn ten spell attack 1 consumables
+        this.spells = [];
+        for (let i = 0; i < 10; i++) {
+            this.spells.push({
+                x: Math.floor(Math.random() * (this.mapSize + 1)),
+                y: Math.floor(Math.random() * (this.mapSize + 1)),
+
+                //collision
+                width: 3,
+                height: 3,
+
+                attackNumber: 1,
+                id: i // for now
+            });
+        }
     }
 
     addPlayer() {
@@ -143,7 +164,9 @@ class Game {
             health: 100,
 
             isAlive: true,
-            deathTime: 0
+            deathTime: 0,
+
+            spells: [{ attackNumber: 0, amount: 0 }, { attackNumber: 0, amount: 0 }, { attackNumber: 0, amount: 0 }]
         };
         this.players.push(player);
         return player;
@@ -196,6 +219,28 @@ class Game {
                 });
             });
 
+        // player collects spell consumables
+        this.players.forEach(player => {
+            // is this legal checks would need to be performed here
+
+            this.spells.forEach(spell => {
+                if (this.isColliding(player, spell)) {
+                    const player_spell = player.spells.find(s => s.attackNumber === spell.attackNumber);
+                    if (player_spell) {
+                        player_spell.amount++;
+                    } else {
+                        player.spells.push({ attackNumber: spell.attackNumber, amount: 1 });
+                    }
+                    this.spells.splice(this.spells.indexOf(spell), 1);
+                    ws_server.clients.forEach(client => {
+                        if (client.player === player && client.readyState === WebSocket.OPEN)
+                            client.send(JSON.stringify({ type: 'new_spell', attackNumber: spell.attackNumber }));
+                    });
+                    notify_all_clients(JSON.stringify({ type: 'spell_collected', id: spell.id }));
+                }
+            });
+        });
+
         // combat attacks
         this.combat.attacks.forEach(attack => {
             this.networkUpdates.combat.attacks.push(attack);
@@ -229,6 +274,17 @@ class Game {
             notify_all_clients(dataview);
             this.networkUpdates.combat.attacks.splice(this.networkUpdates.combat.attacks.indexOf(attack), 1);
         });
+    }
+
+    isColliding(object1, object2) {
+        if (object1.x < object2.x + object2.width &&
+            object1.x + object1.width > object2.x &&
+            object1.y < object2.y + object2.height &&
+            object1.y + object1.height > object2.y) {
+            return true;
+        } else {
+            return false;
+        }
     }
 }
 
