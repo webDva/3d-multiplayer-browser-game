@@ -47,9 +47,17 @@ ws_server.on('connection', (websocket) => {
                 websocket.send(JSON.stringify({
                     type: 'welcome',
                     id: websocket.player.id,
-                    player_list: players_list,
-                    spells: game.spells
+                    player_list: players_list
                 }));
+                game.spells.forEach(spell => {
+                    websocket.send(JSON.stringify({
+                        type: 'spawned_spell',
+                        x: spell.x,
+                        y: spell.y,
+                        attackNumber: spell.attackNumber,
+                        id: spell.id
+                    }));
+                });
                 // notify the rest of the room of the new player
                 notify_all_clients(JSON.stringify({
                     type: 'new_player',
@@ -82,7 +90,7 @@ ws_server.on('connection', (websocket) => {
                 const target = client_dataview.getUint32(1); // player ID or mob ID
                 const attack = client_dataview.getUint8(5); // attack type or ID, an unsigned byte
                 const player_spell = player.spells.find(spell => spell.attackNumber === attack);
-                if (player_spell.amount > 0) {
+                if (player_spell && player_spell.amount > 0) {
                     player_spell.amount--;
                     game.combat.attacks.push({ attacker: player.id, target: target, attack: attack });
                 }
@@ -116,17 +124,42 @@ class Game {
             attacks: []
         };
 
-        // spawn spell attack 1 consumables
+        // spawn spell attack consumables
         this.spells = [];
         for (let i = 0; i < 100; i++) {
-            this.spells.push({
-                x: Math.floor(Math.random() * (this.mapSize + 1)),
-                y: Math.floor(Math.random() * (this.mapSize + 1)),
-
-                attackNumber: 1,
-                id: i // for now
-            });
+            this.spells.push(this.createSpell());
         }
+
+        // spawn a new random spell in intervals
+        setInterval(() => {
+            if (this.spells.length < 100) { // check if limit
+                const spell = this.createSpell();
+                this.spells.push(spell);
+                notify_all_clients(JSON.stringify({
+                    type: 'spawned_spell',
+                    x: spell.x,
+                    y: spell.y,
+                    attackNumber: spell.attackNumber,
+                    id: spell.id
+                }));
+            }
+        }, 1000);
+    }
+
+    createSpell() {
+        let id = new Uint32Array(uuidv4(null, Buffer.from(new Uint32Array(1)), 0).buffer, 0, 1)[0];
+        while (this.spells.find(spell => spell.id === id)) {
+            id = new Uint32Array(uuidv4(null, Buffer.from(new Uint32Array(1)), 0).buffer, 0, 1)[0];
+        }
+        const spell = {
+            x: Math.floor(Math.random() * (this.mapSize + 1)),
+            y: Math.floor(Math.random() * (this.mapSize + 1)),
+
+            attackNumber: Math.floor(Math.random() * (2 - 1 + 1) + 1), // two spells for now
+            id: id
+        };
+
+        return spell;
     }
 
     addPlayer() {
@@ -161,8 +194,13 @@ class Game {
             isAlive: true,
             deathTime: 0,
 
-            spells: [{ attackNumber: 0, amount: 0 }, { attackNumber: 0, amount: 0 }, { attackNumber: 0, amount: 0 }]
+            spells: []
         };
+
+        for (let i = 1; i <= 3; i++) { // three spells for now
+            player.spells.push({ attackNumber: i, amount: 0 });
+        }
+
         this.players.push(player);
         return player;
     }
@@ -221,11 +259,7 @@ class Game {
             this.spells.forEach(spell => {
                 if (this.pointCircleCollision(spell, player)) {
                     const player_spell = player.spells.find(s => s.attackNumber === spell.attackNumber);
-                    if (player_spell) {
-                        player_spell.amount++;
-                    } else {
-                        player.spells.push({ attackNumber: spell.attackNumber, amount: 1 });
-                    }
+                    player_spell.amount++;
                     this.spells.splice(this.spells.indexOf(spell), 1);
                     ws_server.clients.forEach(client => {
                         if (client.player === player && client.readyState === WebSocket.OPEN)

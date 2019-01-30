@@ -125,7 +125,7 @@ function create_player(player_data, id = null) {
 
 function attackClicked(attackNumber, attackElementID, counterElementID) {
     const consumed_spell = player.spells.find(spell => spell.attackNumber === attackNumber);
-    if (player.combat.target && consumed_spell && consumed_spell.amount > 0) {
+    if (player.combat.target && consumed_spell.amount > 0) {
         player.combat.attack = attackNumber;
         consumed_spell.amount--;
         if (consumed_spell.amount === 0) {
@@ -137,14 +137,14 @@ function attackClicked(attackNumber, attackElementID, counterElementID) {
     }
 }
 
-const attack1 = document.getElementById('attack-1');
-attack1.onclick = function () {
-    attackClicked(1, 'attack-1', 'counter-1');
-};
+for (let i = 1; i <= 3; i++) {
+    document.getElementById(`attack-${i}`).onclick = function () {
+        attackClicked(i, `attack-${i}`, `counter-${i}`);
+    };
+}
 
-const attack2 = document.getElementById('attack-2');
-attack2.onclick = function () {
-    attackClicked(2, 'attack-2', 'counter-2');
+for (let i = 1; i <= 3; i++) {
+    player.spells.push({ attackNumber: i, amount: 0 });
 }
 
 // configure WebSocket client
@@ -162,15 +162,6 @@ websocket.onmessage = (event) => {
                 create_player(player_data, player.id);
             });
 
-            data.spells.forEach(spell => {
-                const spell_consumable = BABYLON.MeshBuilder.CreateSphere('sphere', { diameter: 1 }, scene);
-                spell_consumable.KGAME_TYPE = 2;
-                spell_consumable.position = new BABYLON.Vector3(spell.y, 1, spell.x);
-                spell_consumable.material = new BABYLON.StandardMaterial('standardMaterial', scene);
-                spell_consumable.material.emissiveColor = new BABYLON.Color4(0, 0, spell.attackNumber / 1, 1);
-                spell_consumables.push({ mesh: spell_consumable, id: spell.id });
-            });
-
             // display DOM user interface
             document.getElementById('attack-buttons-container').style.display = 'flex';
         }
@@ -182,22 +173,28 @@ websocket.onmessage = (event) => {
         if (data.type === 'new_spell') {
             const attackNumber = data.attackNumber;
             const existingSpell = player.spells.find(spell_object => spell_object.attackNumber === attackNumber);
+            existingSpell.amount++;
             const counter = document.getElementById(`counter-${attackNumber}`);
-            if (!existingSpell) {
-                player.spells.push({ attackNumber: attackNumber, amount: 1 });
-                counter.innerText = 1;
-            } else {
-                existingSpell.amount++;
-                counter.innerText = existingSpell.amount;
+            counter.innerText = existingSpell.amount;
+            if (existingSpell.amount === 1) {
+                const attackElement = document.getElementById(`attack-${attackNumber}`);
+                attackElement.style.backgroundColor = 'rgba(71, 67, 99, 1.0)';
             }
-            const attackElement = document.getElementById(`attack-${attackNumber}`);
-            attackElement.style.backgroundColor = 'rgba(71, 67, 99, 1.0)';
         }
 
         if (data.type === 'spell_collected') {
             const findSpell = spell_consumables.find(spell => spell.id === data.id);
             findSpell.mesh.dispose();
             spell_consumables.splice(spell_consumables.indexOf(findSpell), 1);
+        }
+
+        if (data.type === 'spawned_spell') {
+            const spawned_spell = BABYLON.MeshBuilder.CreateSphere('sphere', { diameter: 1 }, scene);
+            spawned_spell.KGAME_TYPE = 2;
+            spawned_spell.position = new BABYLON.Vector3(data.y, 1, data.x);
+            spawned_spell.material = new BABYLON.StandardMaterial('standardMaterial', scene);
+            spawned_spell.material.emissiveColor = new BABYLON.Color4(data.attackNumber & 1, data.attackNumber & 2, data.attackNumber & 3, 1);
+            spell_consumables.push({ mesh: spawned_spell, id: data.id });
         }
 
         if (data.type === 'player_disconnect') {
