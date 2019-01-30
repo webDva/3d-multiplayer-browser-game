@@ -339,6 +339,8 @@ setInterval(() => {
         }
 
         websocket.isAlive = false;
-        websocket.ping(); // show stopping error can occur here
+        if (websocket.readyState === WebSocket.OPEN) {
+            websocket.ping();
+        }
     });
 }, 40000);
