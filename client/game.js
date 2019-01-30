@@ -123,22 +123,28 @@ function create_player(player_data, id = null) {
     });
 }
 
-const attack1 = document.getElementById('attack-1');
-attack1.onclick = function () {
-    const consumed_spell = player.spells.find(spell => spell.attackNumber === 1);
-    if (player.combat.target && consumed_spell) {
-        player.combat.attack = 1;
+function attackClicked(attackNumber, attackElementID, counterElementID) {
+    const consumed_spell = player.spells.find(spell => spell.attackNumber === attackNumber);
+    if (player.combat.target && consumed_spell && consumed_spell.amount > 0) {
+        player.combat.attack = attackNumber;
         consumed_spell.amount--;
-        const counter = document.getElementById('counter-1');
+        if (consumed_spell.amount === 0) {
+            const attackElement = document.getElementById(attackElementID);
+            attackElement.style.backgroundColor = 'rgba(50, 35, 70, 0.5)';
+        }
+        const counter = document.getElementById(counterElementID);
         counter.innerText = consumed_spell.amount;
     }
+}
+
+const attack1 = document.getElementById('attack-1');
+attack1.onclick = function () {
+    attackClicked(1, 'attack-1', 'counter-1');
 };
 
 const attack2 = document.getElementById('attack-2');
 attack2.onclick = function () {
-    if (player.combat.target) {
-        player.combat.attack = 2;
-    }
+    attackClicked(2, 'attack-2', 'counter-2');
 }
 
 // configure WebSocket client
@@ -176,7 +182,7 @@ websocket.onmessage = (event) => {
         if (data.type === 'new_spell') {
             const attackNumber = data.attackNumber;
             const existingSpell = player.spells.find(spell_object => spell_object.attackNumber === attackNumber);
-            const counter = document.getElementById('counter-1');
+            const counter = document.getElementById(`counter-${attackNumber}`);
             if (!existingSpell) {
                 player.spells.push({ attackNumber: attackNumber, amount: 1 });
                 counter.innerText = 1;
@@ -184,6 +190,8 @@ websocket.onmessage = (event) => {
                 existingSpell.amount++;
                 counter.innerText = existingSpell.amount;
             }
+            const attackElement = document.getElementById(`attack-${attackNumber}`);
+            attackElement.style.backgroundColor = 'rgba(71, 67, 99, 1.0)';
         }
 
         if (data.type === 'spell_collected') {

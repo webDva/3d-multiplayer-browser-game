@@ -36,7 +36,7 @@ html, body {
     padding: 2px;
     border: 4px solid black;
     border-radius: 8px;
-    background-color: rgb(71, 67, 99);
+    background-color: rgba(50, 35, 70, 0.5);
     color: white;
     font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
     font-size: 26px;
