@@ -1,7 +1,7 @@
 const express = require('express');
 const app = express();
 const httpServer = require('http').Server(app);
-const WebSocket = require('ws');
+const WebSocket = require('uws');
 const ws_server = new WebSocket.Server({ server: httpServer });
 const path = require('path');
 const uuidv4 = require('uuid/v4');
@@ -101,15 +101,12 @@ function createBinaryFrame(id, segments, id_size = true) { // segments is a list
     return dataview;
 }
 
-ws_server.on('connection', (websocket) => {
-    websocket.binaryType = 'arraybuffer';
+ws_server.on('connection', websocket => {
     websocket.isAlive = true; // create this property for the sake of implementing ping-pong heartbeats
 
     websocket.player = game.addPlayer();
 
-    websocket.on('message', (message) => {
-        let arraybuffer, server_dataview;
-
+    websocket.on('message', message => {
         if (typeof message === 'string') {
             const data = JSON.parse(message);
 

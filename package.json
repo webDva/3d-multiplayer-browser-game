@@ -1,9 +1,7 @@
 {
     "main": "server.js",
     "scripts": {
-        "start": "node server.js",
-        "start_debug": "node --inspect-brk server.js",
-        "start_debug_no_break": "node --inspect server.js"
+        "start": "node server.js"
     },
     "engines": {
         "node": "9.4.0",
@@ -14,6 +12,6 @@
         "http": "0.0.0",
         "path": "^0.12.7",
         "uuidv4": "^2.0.0",
-        "ws": "^6.1.2"
+        "uws": "10.148.1"
     }
 }
