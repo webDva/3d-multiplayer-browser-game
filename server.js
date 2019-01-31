@@ -22,6 +22,85 @@ function notify_all_clients(data, exception = null) {
     });
 }
 
+function createBinaryFrame(id, segments, id_size = true) { // segments is a list of objects with type and value properties
+    let segments_length = 0;
+    segments.forEach(segment => {
+        switch (segment.type) {
+            case 'Int8':
+            case 'Uint8':
+                segments_length += 1;
+                break;
+            case 'Int16':
+            case 'Uint16':
+                segments_length += 2;
+                break;
+            case 'Int32':
+            case 'Uint32':
+            case 'Float32':
+                segments_length += 4;
+                break;
+            case 'Float64':
+                segments_length += 8;
+                break;
+        }
+    });
+
+    // if id_size is true, the id is one byte. else the id is two bytes
+    const IDSize = id_size ? 1 : 2;
+    const arraybuffer = new ArrayBuffer(IDSize + segments_length);
+    const dataview = new DataView(arraybuffer);
+
+    switch (IDSize) {
+        case 1:
+            dataview.setUint8(0, id);
+            break;
+        case 2:
+            dataview.setUint16(0, id);
+            break;
+    }
+
+    // offsets will be automatically calculated by this function, so the user needs to establish his segments' order
+    let offset = IDSize;
+    segments.forEach(segment => {
+        switch (segment.type) {
+            case 'Int8':
+                dataview.setInt8(offset, segment.value);
+                offset += 1;
+                break;
+            case 'Uint8':
+                dataview.setUint8(offset, segment.value);
+                offset += 1;
+                break;
+            case 'Int16':
+                dataview.setInt16(offset, segment.value);
+                offset += 2;
+                break;
+            case 'Uint16':
+                dataview.setUint16(offset, segment.value);
+                offset += 2;
+                break;
+            case 'Int32':
+                dataview.setInt32(offset, segment.value);
+                offset += 4;
+                break;
+            case 'Uint32':
+                dataview.setUint32(offset, segment.value);
+                offset += 4;
+                break;
+            case 'Float32':
+                dataview.setFloat32(offset, segment.value);
+                offset += 4;
+                break;
+            case 'Float64':
+                dataview.setFloat64(offset, segment.value);
+                offset += 8;
+                break;
+        }
+    });
+
+    return dataview;
+}
+
 ws_server.on('connection', (websocket) => {
     websocket.binaryType = 'arraybuffer';
     websocket.isAlive = true; // create this property for the sake of implementing ping-pong heartbeats
@@ -231,6 +310,7 @@ class Game {
         let arraybuffer, dataview;
 
         // respawn players and notify the connected players
+        // leaving this alone for now. it's so behind.
         this.players.filter(player => {
             if (!player.isAlive && Date.now() - player.deathTime >= 5000)
                 return true;
@@ -257,7 +337,7 @@ class Game {
             // is this legal checks would need to be performed here
 
             this.spells.forEach(spell => {
-                if (this.pointCircleCollision(spell, player)) {
+                if (pointCircleCollision(spell, player)) {
                     const player_spell = player.spells.find(s => s.attackNumber === spell.attackNumber);
                     player_spell.amount++;
                     this.spells.splice(this.spells.indexOf(spell), 1);
@@ -278,56 +358,45 @@ class Game {
     }
 
     sendNetworkUpdates() {
-        let arraybuffer, dataview;
-
         // send player orientations
-        arraybuffer = new ArrayBuffer(1 + 1 + this.players.length * (4 + 4 + 4 + 4));
-        dataview = new DataView(arraybuffer);
-        dataview.setUint8(0, 1); // one byte unsigned event/message type
-        dataview.setUint8(1, this.players.length); // number of player binary data structures
-        this.players.forEach((player, index) => {
-            dataview.setUint32(2 + index * 16, player.id);
-            dataview.setFloat32(6 + index * 16, player.x);
-            dataview.setFloat32(10 + index * 16, player.y);
-            dataview.setFloat32(14 + index * 16, player.direction);
+        let orientations = [];
+        orientations.push({ type: 'Uint8', value: this.players.length });
+        this.players.forEach(player => {
+            orientations.push({ type: 'Uint32', value: player.id });
+            orientations.push({ type: 'Float32', value: player.x });
+            orientations.push({ type: 'Float32', value: player.y });
+            orientations.push({ type: 'Float32', value: player.direction });
         });
-        notify_all_clients(dataview);
+        const orientationsBinaryFrame = createBinaryFrame(1, orientations);
+        notify_all_clients(orientationsBinaryFrame);
 
+        // send attacks that players performed
         this.networkUpdates.combat.attacks.forEach(attack => {
-            arraybuffer = new ArrayBuffer(1 + 4 + 4 + 1);
-            dataview = new DataView(arraybuffer);
-            dataview.setUint8(0, 2);
-            dataview.setUint32(1, attack.attacker);
-            dataview.setUint32(5, attack.target);
-            dataview.setUint8(9, attack.attack);
-            notify_all_clients(dataview);
+            const combatBinaryFrame = createBinaryFrame(2, [
+                { type: 'Uint32', value: attack.attacker },
+                { type: 'Uint32', value: attack.target },
+                { type: 'Uint8', value: attack.attack }
+            ]);
+            notify_all_clients(combatBinaryFrame);
             this.networkUpdates.combat.attacks.splice(this.networkUpdates.combat.attacks.indexOf(attack), 1);
         });
-    }
-
-    pointCircleCollision(point, circle) {
-        if (Math.sqrt(Math.pow(point.x - circle.x, 2) + Math.pow(point.y - circle.y, 2)) <= circle.radius) {
-            return true;
-        } else {
-            return false;
-        }
     }
 }
 
 const game = new Game();
 
-setInterval(() => {
+setInterval(function () {
     game.physicsLoop();
 }, 1000 / config.physicsTickRate);
-setInterval(() => {
+setInterval(function () {
     game.gameLogicLoop();
 }, 1000 / config.physicsTickRate);
-setInterval(() => {
+setInterval(function () {
     game.sendNetworkUpdates();
 }, 1000 / config.networkUpdatePulseRate);
 
 // ping-pong heartbeat
-setInterval(() => {
+setInterval(function () {
     ws_server.clients.forEach(websocket => {
         if (websocket.isAlive === false) {
             game.players.splice(game.players.indexOf(websocket.player), 1);
@@ -344,3 +413,11 @@ setInterval(() => {
         }
     });
 }, 40000);
+
+function pointCircleCollision(point, circle) {
+    if (Math.sqrt(Math.pow(point.x - circle.x, 2) + Math.pow(point.y - circle.y, 2)) <= circle.radius) {
+        return true;
+    } else {
+        return false;
+    }
+}
