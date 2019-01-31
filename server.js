@@ -15,11 +15,16 @@ httpServer.listen(PORT, function () {
     console.log('listening on port ' + PORT);
 });
 
-function notify_all_clients(data, exception = null) {
+function broadcast(data, exception = null) {
     ws_server.clients.forEach(client => {
         if (client !== exception && client.readyState === WebSocket.OPEN)
             client.send(data);
     });
+}
+
+function transmit(data, websocket) {
+    if (websocket.readyState === WebSocket.OPEN)
+        websocket.send(data);
 }
 
 function createBinaryFrame(id, segments, id_size = true) { // segments is a list of objects with type and value properties
@@ -111,44 +116,46 @@ ws_server.on('connection', websocket => {
             const data = JSON.parse(message);
 
             if (data.type === 'join') {
-                let players_list = [];
-                game.players.forEach(user => {
-                    players_list.push({
-                        id: user.id,
-                        x: user.x,
-                        y: user.y,
-                        direction: user.direction
-                    });
-                });
-                websocket.send(JSON.stringify({
-                    type: 'welcome',
-                    id: websocket.player.id,
-                    player_list: players_list
-                }));
+                // send welcome message. the player's id
+                transmit(createBinaryFrame(3, [{ type: 'Uint32', value: websocket.player.id }]), websocket);
+
+                // send the spells of the map to the new player
                 game.spells.forEach(spell => {
-                    websocket.send(JSON.stringify({
-                        type: 'spawned_spell',
-                        x: spell.x,
-                        y: spell.y,
-                        attackNumber: spell.attackNumber,
-                        id: spell.id
-                    }));
+                    transmit(createBinaryFrame(5, [
+                        { type: 'Uint32', value: spell.id },
+                        { type: 'Uint8', value: spell.attackNumber },
+                        { type: 'Float32', value: spell.x },
+                        { type: 'Float32', value: spell.y }
+                    ]), websocket);
                 });
+
                 // notify the rest of the room of the new player
-                notify_all_clients(JSON.stringify({
-                    type: 'new_player',
-                    id: websocket.player.id,
-                    x: websocket.player.x,
-                    y: websocket.player.y,
-                    direction: websocket.player.direction
-                }), websocket);
+                broadcast(createBinaryFrame(4, [
+                    { type: 'Uint32', value: websocket.player.id },
+                    { type: 'Float32', value: websocket.player.x },
+                    { type: 'Float32', value: websocket.player.y },
+                    { type: 'Float32', value: websocket.player.direction }
+                ]), websocket);
+            }
+
+            // a player has requested the list of players
+            if (data.type === 'request_playerlist') {
+                game.players.forEach(player => {
+                    transmit(createBinaryFrame(4, [
+                        { type: 'Uint32', value: player.id },
+                        { type: 'Float32', value: player.x },
+                        { type: 'Float32', value: player.y },
+                        { type: 'Float32', value: player.direction }
+                    ]), websocket);
+                });
             }
         }
 
         if (message instanceof ArrayBuffer) {
             const client_dataview = new DataView(message);
 
-            if (client_dataview.getUint8(0) === 1) { // player movement
+            // player movement
+            if (client_dataview.getUint8(0) === 1) {
                 const player = websocket.player;
                 player.isMoving = true;
                 // change the player's direction
@@ -161,7 +168,8 @@ ws_server.on('connection', websocket => {
                 player.velocityY = Math.sin(player.direction) * player.movement_speed;
             }
 
-            if (client_dataview.getUint8(0) === 3) { // player is attacking someone or something
+            // player is attacking someone or something
+            if (client_dataview.getUint8(0) === 3) {
                 const player = websocket.player;
                 const target = client_dataview.getUint32(1); // player ID or mob ID
                 const attack = client_dataview.getUint8(5); // attack type or ID, an unsigned byte
@@ -176,10 +184,7 @@ ws_server.on('connection', websocket => {
 
     websocket.on('close', () => {
         game.players.splice(game.players.indexOf(websocket.player), 1);
-        notify_all_clients(JSON.stringify({
-            type: 'player_disconnect',
-            id: websocket.player.id
-        }), websocket);
+        broadcast(createBinaryFrame(6, [{ type: 'Uint32', value: websocket.player.id }]), websocket);
     });
 
     websocket.on('pong', () => websocket.isAlive = true);
@@ -211,13 +216,12 @@ class Game {
             if (this.spells.length < 100) { // check if limit
                 const spell = this.createSpell();
                 this.spells.push(spell);
-                notify_all_clients(JSON.stringify({
-                    type: 'spawned_spell',
-                    x: spell.x,
-                    y: spell.y,
-                    attackNumber: spell.attackNumber,
-                    id: spell.id
-                }));
+                broadcast(createBinaryFrame(5, [
+                    { type: 'Uint32', value: spell.id },
+                    { type: 'Uint8', value: spell.attackNumber },
+                    { type: 'Float32', value: spell.x },
+                    { type: 'Float32', value: spell.y }
+                ]));
             }
         }, 1000);
     }
@@ -338,11 +342,11 @@ class Game {
                     const player_spell = player.spells.find(s => s.attackNumber === spell.attackNumber);
                     player_spell.amount++;
                     this.spells.splice(this.spells.indexOf(spell), 1);
-                    ws_server.clients.forEach(client => {
+                    ws_server.clients.forEach(client => { // find the socket that the player belongs to
                         if (client.player === player && client.readyState === WebSocket.OPEN)
-                            client.send(JSON.stringify({ type: 'new_spell', attackNumber: spell.attackNumber }));
+                            client.send(createBinaryFrame(8, [{ type: 'Uint8', value: spell.attackNumber }]));
                     });
-                    notify_all_clients(JSON.stringify({ type: 'spell_collected', id: spell.id }));
+                    broadcast(createBinaryFrame(7, [{ type: 'Uint32', value: spell.id }]));
                 }
             });
         });
@@ -365,7 +369,7 @@ class Game {
             orientations.push({ type: 'Float32', value: player.direction });
         });
         const orientationsBinaryFrame = createBinaryFrame(1, orientations);
-        notify_all_clients(orientationsBinaryFrame);
+        broadcast(orientationsBinaryFrame);
 
         // send attacks that players performed
         this.networkUpdates.combat.attacks.forEach(attack => {
@@ -374,9 +378,17 @@ class Game {
                 { type: 'Uint32', value: attack.target },
                 { type: 'Uint8', value: attack.attack }
             ]);
-            notify_all_clients(combatBinaryFrame);
+            broadcast(combatBinaryFrame);
             this.networkUpdates.combat.attacks.splice(this.networkUpdates.combat.attacks.indexOf(attack), 1);
         });
+    }
+}
+
+function pointCircleCollision(point, circle) {
+    if (Math.sqrt(Math.pow(point.x - circle.x, 2) + Math.pow(point.y - circle.y, 2)) <= circle.radius) {
+        return true;
+    } else {
+        return false;
     }
 }
 
@@ -397,10 +409,7 @@ setInterval(function () {
     ws_server.clients.forEach(websocket => {
         if (websocket.isAlive === false) {
             game.players.splice(game.players.indexOf(websocket.player), 1);
-            notify_all_clients(JSON.stringify({
-                type: 'player_disconnect',
-                id: websocket.player.id
-            }), websocket);
+            broadcast(createBinaryFrame(6, [{ type: 'Uint32', value: websocket.player.id }]), websocket);
             return websocket.terminate();
         }
 
@@ -410,11 +419,3 @@ setInterval(function () {
         }
     });
 }, 40000);
-
-function pointCircleCollision(point, circle) {
-    if (Math.sqrt(Math.pow(point.x - circle.x, 2) + Math.pow(point.y - circle.y, 2)) <= circle.radius) {
-        return true;
-    } else {
-        return false;
-    }
-}

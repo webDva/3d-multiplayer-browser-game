@@ -94,7 +94,7 @@ let attacker, target, isParticlesStarted = false;
 
 let spell_consumables = [];
 
-function create_player(player_data, id = null) {
+function create_player(id, x, y, direction) {
     BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'kawaii.babylon', scene).then(function (imported) {
         const mesh = imported.meshes[0];
 
@@ -108,12 +108,11 @@ function create_player(player_data, id = null) {
         mesh.idleRange.animation = scene.beginAnimation(mesh.skeleton, mesh.idleRange.from, mesh.idleRange.to, true, 1);
 
         mesh.KGAME_TYPE = 1; // KGAME_TYPE 1 means that it is a kawaii game mesh of type 1
-        player_list.push({ id: player_data.id, x: player_data.x, y: player_data.y, mesh: mesh, direction: player_data.direction, previousX: player_data.x, previousY: player_data.y });
-        mesh.position.z = player_data.x;
-        mesh.position.x = player_data.y;
+        player_list.push({ id: id, x: x, y: y, mesh: mesh, direction: direction, previousX: x, previousY: y });
+        mesh.position.z = x;
+        mesh.position.x = y;
 
-        // fill player's personal player object if the id belongs to the player and start the session
-        if (id && player_data.id === id) {
+        if (player.id === id) {
             player.mesh = mesh;
             camera.lockedTarget = player.mesh;
             //camera.target = player.mesh;
@@ -155,60 +154,24 @@ websocket.binaryType = 'arraybuffer';
 websocket.onmessage = (event) => {
     if (typeof event.data === 'string') {
         const data = JSON.parse(event.data);
-
-        if (data.type === 'welcome') {
-            player.id = data.id;
-            data.player_list.forEach(player_data => {
-                create_player(player_data, player.id);
-            });
-
-            // display DOM user interface
-            document.getElementById('attack-buttons-container').style.display = 'flex';
-        }
-
-        if (data.type === 'new_player') {
-            create_player(data);
-        }
-
-        if (data.type === 'new_spell') {
-            const attackNumber = data.attackNumber;
-            const existingSpell = player.spells.find(spell_object => spell_object.attackNumber === attackNumber);
-            existingSpell.amount++;
-            const counter = document.getElementById(`counter-${attackNumber}`);
-            counter.innerText = existingSpell.amount;
-            if (existingSpell.amount === 1) {
-                const attackElement = document.getElementById(`attack-${attackNumber}`);
-                attackElement.style.backgroundColor = 'rgba(71, 67, 99, 1.0)';
-            }
-        }
-
-        if (data.type === 'spell_collected') {
-            const findSpell = spell_consumables.find(spell => spell.id === data.id);
-            findSpell.mesh.dispose();
-            spell_consumables.splice(spell_consumables.indexOf(findSpell), 1);
-        }
-
-        if (data.type === 'spawned_spell') {
-            const spawned_spell = BABYLON.MeshBuilder.CreateSphere('sphere', { diameter: 1 }, scene);
-            spawned_spell.KGAME_TYPE = 2;
-            spawned_spell.position = new BABYLON.Vector3(data.y, 1, data.x);
-            spawned_spell.material = new BABYLON.StandardMaterial('standardMaterial', scene);
-            spawned_spell.material.emissiveColor = new BABYLON.Color4(data.attackNumber & 1, data.attackNumber & 2, data.attackNumber & 3, 1);
-            spell_consumables.push({ mesh: spawned_spell, id: data.id });
-        }
-
-        if (data.type === 'player_disconnect') {
-            const player_object = player_list.find(player_object => player_object.id === data.id);
-            player_object.mesh.dispose();
-            player_list.splice(player_list.indexOf(player_object), 1);
-        }
-
     }
 
     if (event.data instanceof ArrayBuffer) {
         const dataview = new DataView(event.data);
 
-        if (dataview.getUint8(0) === 1) { // player orientations
+        // welcome message id sent to the player
+        if (dataview.getUint8(0) === 3) {
+            player.id = dataview.getUint32(1);
+
+            // display DOM user interface
+            document.getElementById('attack-buttons-container').style.display = 'flex';
+
+            // request list of players
+            websocket.send(JSON.stringify({ type: 'request_playerlist' }));
+        }
+
+        // player orientations
+        if (dataview.getUint8(0) === 1) {
             for (let i = 0; i < dataview.getUint8(1); i++) {
                 const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(2 + i * 16));
                 if (player_object) {
@@ -219,7 +182,8 @@ websocket.onmessage = (event) => {
             }
         }
 
-        if (dataview.getUint8(0) === 2) { // attacks
+        // attacks
+        if (dataview.getUint8(0) === 2) {
             attacker = player_list.find(player_object => player_object.id === dataview.getUint32(1));
             target = player_list.find(player_object => player_object.id === dataview.getUint32(5));
             if (dataview.getUint8(9) === 1) {
@@ -228,6 +192,48 @@ websocket.onmessage = (event) => {
             } else if (dataview.getUint8(9) === 2) {
                 const particleSystem = create_particles(ParticlesConfiguration.Attack2Particles, null, target.mesh);
                 particles.push({ system: particleSystem, type: 'Attack2', time: Date.now() });
+            }
+        }
+
+        // new player joins
+        if (dataview.getUint8(0) === 4) {
+            create_player(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getFloat32(13));
+        }
+
+        // a new spell has spawned
+        if (dataview.getUint8(0) === 5) {
+            const spawned_spell = BABYLON.MeshBuilder.CreateSphere('sphere', { diameter: 1 }, scene);
+            spawned_spell.KGAME_TYPE = 2;
+            spawned_spell.position = new BABYLON.Vector3(dataview.getFloat32(10), 1, dataview.getFloat32(6));
+            spawned_spell.material = new BABYLON.StandardMaterial('standardMaterial', scene);
+            spawned_spell.material.emissiveColor = new BABYLON.Color4(dataview.getUint8(5) & 1, dataview.getUint8(5) & 2, dataview.getUint8(5) & 3, 1);
+            spell_consumables.push({ mesh: spawned_spell, id: dataview.getUint32(1) });
+        }
+
+        // player disconnect
+        if (dataview.getUint8(0) === 6) {
+            const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(1));
+            player_object.mesh.dispose();
+            player_list.splice(player_list.indexOf(player_object), 1);
+        }
+
+        // a spell has been collected by a player
+        if (dataview.getUint8(0) === 7) {
+            const findSpell = spell_consumables.find(spell => spell.id === dataview.getUint32(1));
+            findSpell.mesh.dispose();
+            spell_consumables.splice(spell_consumables.indexOf(findSpell), 1);
+        }
+
+        // the player has recieved a new spell
+        if (dataview.getUint8(0) === 8) {
+            const attackNumber = dataview.getUint8(1);
+            const existingSpell = player.spells.find(spell_object => spell_object.attackNumber === attackNumber);
+            existingSpell.amount++;
+            const counter = document.getElementById(`counter-${attackNumber}`);
+            counter.innerText = existingSpell.amount;
+            if (existingSpell.amount === 1) {
+                const attackElement = document.getElementById(`attack-${attackNumber}`);
+                attackElement.style.backgroundColor = 'rgba(71, 67, 99, 1.0)';
             }
         }
 

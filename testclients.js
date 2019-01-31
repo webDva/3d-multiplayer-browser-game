@@ -9,10 +9,9 @@ class Client {
         this.websocket.binaryType = 'arraybuffer';
 
         this.websocket.onmessage = (event) => {
-            if (typeof event.data === 'string') {
-                const data = JSON.parse(event.data);
-
-                if (data.type === 'welcome') {
+            if (event.data instanceof ArrayBuffer) {
+                const dataview = new DataView(event.data);
+                if (dataview.getUint8(0) === 3) {
                     this.session_started = true;
                 }
             }
