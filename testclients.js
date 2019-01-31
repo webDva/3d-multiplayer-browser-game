@@ -1,4 +1,4 @@
-const WebSocket = require('ws');
+const WebSocket = require('uws');
 
 class Client {
     constructor(move_rate) {
@@ -38,8 +38,9 @@ class Client {
     }
 }
 
-const move_rate = 2500;
-const clients = 20;
+const clients = (process.argv.length > 2) ? process.argv[2] : 20;
+const move_rate = (process.argv.length > 3) ? process.argv[3] : 2500;
+// node testclients.js [clients_no] [move_rate_no]
 
 console.log(`${clients} clients connecting at a move rate of ${move_rate}.`);
 
