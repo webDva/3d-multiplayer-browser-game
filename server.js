@@ -206,6 +206,10 @@ class Game {
                 attacks: [],
                 deaths: [],
                 respawns: [] // or joins
+            },
+            spells: {
+                spawned: [],
+                collected: [] // an object of the spell and the player to give them their new spell
             }
         };
         this.combat = {
@@ -215,20 +219,13 @@ class Game {
         // spawn spell attack consumables
         this.spells = [];
         for (let i = 0; i < 100; i++) {
-            this.spells.push(this.createSpell());
+            this.createSpell();
         }
 
         // spawn a new random spell in intervals
         setInterval(() => {
             if (this.spells.length < 100) { // check if limit
-                const spell = this.createSpell();
-                this.spells.push(spell);
-                broadcast(createBinaryFrame(5, [
-                    { type: 'Uint32', value: spell.id },
-                    { type: 'Uint8', value: spell.attackNumber },
-                    { type: 'Float32', value: spell.x },
-                    { type: 'Float32', value: spell.y }
-                ]));
+                this.createSpell();
             }
         }, 1000);
     }
@@ -246,7 +243,8 @@ class Game {
             id: id
         };
 
-        return spell;
+        this.spells.push(spell);
+        this.networkUpdates.spells.spawned.push(spell);
     }
 
     addPlayer() {
@@ -274,9 +272,7 @@ class Game {
             targetY: 0,
             isMoving: false,
 
-            // Int32Array, 4 bytes, 32-bit two's complement signed integer
-            // won't be sent to the player for now
-            health: 100,
+            health: 100, // has to be a signed 32-bit integer for negative health values
 
             isAlive: true,
             deathTime: 0,
@@ -349,8 +345,7 @@ class Game {
                     const player_spell = player.spells.find(s => s.attackNumber === spell.attackNumber);
                     player_spell.amount++;
                     this.spells.splice(this.spells.indexOf(spell), 1);
-                    transmitPlayer(createBinaryFrame(8, [{ type: 'Uint8', value: spell.attackNumber }]), player); // player receives a new spell
-                    broadcast(createBinaryFrame(7, [{ type: 'Uint32', value: spell.id }])); // a spell is now gone from the map
+                    this.networkUpdates.spells.collected.push({ spell: spell, player: player });
                 }
             });
         });
@@ -372,18 +367,43 @@ class Game {
             orientations.push({ type: 'Float32', value: player.y });
             orientations.push({ type: 'Float32', value: player.direction });
         });
-        const orientationsBinaryFrame = createBinaryFrame(1, orientations);
-        broadcast(orientationsBinaryFrame);
+        broadcast(createBinaryFrame(1, orientations));
+
+        // send player healths
+        let healths = [];
+        healths.push({ type: 'Uint8', value: this.players.length });
+        this.players.forEach(player => {
+            healths.push({ type: 'Uint32', value: player.id });
+            healths.push({ type: 'Int32', value: player.health });
+        });
+        broadcast(createBinaryFrame(9, healths));
 
         // send attacks that players performed
         this.networkUpdates.combat.attacks.forEach(attack => {
-            const combatBinaryFrame = createBinaryFrame(2, [
+            broadcast(createBinaryFrame(2, [
                 { type: 'Uint32', value: attack.attacker },
                 { type: 'Uint32', value: attack.target },
                 { type: 'Uint8', value: attack.attack }
-            ]);
-            broadcast(combatBinaryFrame);
+            ]));
             this.networkUpdates.combat.attacks.splice(this.networkUpdates.combat.attacks.indexOf(attack), 1);
+        });
+
+        // send spells that have spawned
+        this.networkUpdates.spells.spawned.forEach(spell => {
+            broadcast(createBinaryFrame(5, [
+                { type: 'Uint32', value: spell.id },
+                { type: 'Uint8', value: spell.attackNumber },
+                { type: 'Float32', value: spell.x },
+                { type: 'Float32', value: spell.y }
+            ]));
+            this.networkUpdates.spells.spawned.splice(this.networkUpdates.spells.spawned.indexOf(spell), 1);
+        });
+
+        // send updates on spells that are now gone from the map
+        this.networkUpdates.spells.collected.forEach(spell_object => {
+            broadcast(createBinaryFrame(7, [{ type: 'Uint32', value: spell_object.spell.id }]));
+            transmitPlayer(createBinaryFrame(8, [{ type: 'Uint8', value: spell_object.spell.attackNumber }]), spell_object.player);
+            this.networkUpdates.spells.collected.splice(this.networkUpdates.spells.collected.indexOf(spell_object), 1);
         });
     }
 }

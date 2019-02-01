@@ -108,7 +108,16 @@ function create_player(id, x, y, direction) {
         mesh.idleRange.animation = scene.beginAnimation(mesh.skeleton, mesh.idleRange.from, mesh.idleRange.to, true, 1);
 
         mesh.KGAME_TYPE = 1; // KGAME_TYPE 1 means that it is a kawaii game mesh of type 1
-        player_list.push({ id: id, x: x, y: y, mesh: mesh, direction: direction, previousX: x, previousY: y });
+        player_list.push({
+            id: id,
+            x: x,
+            y: y,
+            mesh: mesh,
+            direction: direction,
+            previousX: x,
+            previousY: y,
+            health: 0
+        });
         mesh.position.z = x;
         mesh.position.x = y;
 
@@ -217,11 +226,13 @@ websocket.onmessage = (event) => {
             player_list.splice(player_list.indexOf(player_object), 1);
         }
 
-        // a spell has been collected by a player
+        // a spell has disappeared from the map
         if (dataview.getUint8(0) === 7) {
             const findSpell = spell_consumables.find(spell => spell.id === dataview.getUint32(1));
-            findSpell.mesh.dispose();
-            spell_consumables.splice(spell_consumables.indexOf(findSpell), 1);
+            if (findSpell) {
+                findSpell.mesh.dispose();
+                spell_consumables.splice(spell_consumables.indexOf(findSpell), 1);
+            }
         }
 
         // the player has recieved a new spell
@@ -234,6 +245,16 @@ websocket.onmessage = (event) => {
             if (existingSpell.amount === 1) {
                 const attackElement = document.getElementById(`attack-${attackNumber}`);
                 attackElement.style.backgroundColor = 'rgba(71, 67, 99, 1.0)';
+            }
+        }
+
+        // player healths update
+        if (dataview.getUint8(0) === 9) {
+            for (let i = 0; i < dataview.getUint8(1); i++) {
+                const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(2 + i * 8));
+                if (player_object) {
+                    player_object.health = dataview.getInt32(6 + i * 8);
+                }
             }
         }
 
