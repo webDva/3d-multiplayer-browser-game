@@ -6,5 +6,7 @@
         "defaultMovementSpeed": 1,
         "radius": 3
     },
-    "mapSize": 25
+    "mapSize": 15,
+    "pingTime": 40,
+    "spellPerPlayer": 5
 }

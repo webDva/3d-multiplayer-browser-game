@@ -175,8 +175,8 @@ websocket.onmessage = (event) => {
             // display DOM user interface
             document.getElementById('attack-buttons-container').style.display = 'flex';
 
-            // request list of players
-            websocket.send(JSON.stringify({ type: 'request_playerlist' }));
+            // request map data
+            websocket.send(JSON.stringify({ type: 'request_map_data' }));
         }
 
         // player orientations
@@ -211,12 +211,16 @@ websocket.onmessage = (event) => {
 
         // a new spell has spawned
         if (dataview.getUint8(0) === 5) {
-            const spawned_spell = BABYLON.MeshBuilder.CreateSphere('sphere', { diameter: 1 }, scene);
-            spawned_spell.KGAME_TYPE = 2;
-            spawned_spell.position = new BABYLON.Vector3(dataview.getFloat32(10), 1, dataview.getFloat32(6));
-            spawned_spell.material = new BABYLON.StandardMaterial('standardMaterial', scene);
-            spawned_spell.material.emissiveColor = new BABYLON.Color4(dataview.getUint8(5) & 1, dataview.getUint8(5) & 2, dataview.getUint8(5) & 3, 1);
-            spell_consumables.push({ mesh: spawned_spell, id: dataview.getUint32(1) });
+            const spellID = dataview.getUint32(1);
+            const newSpell = spell_consumables.find(spell => spell.id === spellID);
+            if (!newSpell) {
+                const spawned_spell = BABYLON.MeshBuilder.CreateSphere('sphere', { diameter: 1 }, scene);
+                spawned_spell.KGAME_TYPE = 2;
+                spawned_spell.position = new BABYLON.Vector3(dataview.getFloat32(10), 1, dataview.getFloat32(6));
+                spawned_spell.material = new BABYLON.StandardMaterial('standardMaterial', scene);
+                spawned_spell.material.emissiveColor = new BABYLON.Color4(dataview.getUint8(5) & 1, dataview.getUint8(5) & 2, dataview.getUint8(5) & 3, 1);
+                spell_consumables.push({ mesh: spawned_spell, id: dataview.getUint32(1) });
+            }
         }
 
         // player disconnect
@@ -229,7 +233,7 @@ websocket.onmessage = (event) => {
         // a spell has disappeared from the map
         if (dataview.getUint8(0) === 7) {
             const findSpell = spell_consumables.find(spell => spell.id === dataview.getUint32(1));
-            if (findSpell) {
+            if (findSpell && findSpell.mesh) { // doesn't function as required but this is a startup
                 findSpell.mesh.dispose();
                 spell_consumables.splice(spell_consumables.indexOf(findSpell), 1);
             }

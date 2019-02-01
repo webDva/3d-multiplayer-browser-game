@@ -4,7 +4,7 @@ const httpServer = require('http').Server(app);
 const WebSocket = require('uws');
 const ws_server = new WebSocket.Server({ server: httpServer });
 const path = require('path');
-const uuidv4 = require('uuid/v4');
+const crypto = require('crypto');
 
 const config = require('./config');
 
@@ -14,6 +14,10 @@ const PORT = process.env.PORT || config.PORT;
 httpServer.listen(PORT, function () {
     console.log('listening on port ' + PORT);
 });
+
+function randomUint32() {
+    return crypto.randomBytes(4).readUInt32BE(0, true);
+}
 
 function broadcast(data, exception = null) {
     ws_server.clients.forEach(client => {
@@ -126,16 +130,6 @@ ws_server.on('connection', websocket => {
                 // send welcome message. the player's id
                 transmit(createBinaryFrame(3, [{ type: 'Uint32', value: websocket.player.id }]), websocket);
 
-                // send the spells of the map to the new player
-                game.spells.forEach(spell => {
-                    transmit(createBinaryFrame(5, [
-                        { type: 'Uint32', value: spell.id },
-                        { type: 'Uint8', value: spell.attackNumber },
-                        { type: 'Float32', value: spell.x },
-                        { type: 'Float32', value: spell.y }
-                    ]), websocket);
-                });
-
                 // notify the rest of the room of the new player
                 broadcast(createBinaryFrame(4, [
                     { type: 'Uint32', value: websocket.player.id },
@@ -145,14 +139,25 @@ ws_server.on('connection', websocket => {
                 ]), websocket);
             }
 
-            // a player has requested the list of players
-            if (data.type === 'request_playerlist') {
+            // a player has requested map data such as players and spells on the map
+            if (data.type === 'request_map_data') {
+                // send list of players
                 game.players.forEach(player => {
                     transmit(createBinaryFrame(4, [
                         { type: 'Uint32', value: player.id },
                         { type: 'Float32', value: player.x },
                         { type: 'Float32', value: player.y },
                         { type: 'Float32', value: player.direction }
+                    ]), websocket);
+                });
+
+                // send the spells of the map to the player
+                game.spells.forEach(spell => {
+                    transmit(createBinaryFrame(5, [
+                        { type: 'Uint32', value: spell.id },
+                        { type: 'Uint8', value: spell.attackNumber },
+                        { type: 'Float32', value: spell.x },
+                        { type: 'Float32', value: spell.y }
                     ]), websocket);
                 });
             }
@@ -215,25 +220,13 @@ class Game {
         this.combat = {
             attacks: []
         };
-
-        // spawn spell attack consumables
         this.spells = [];
-        for (let i = 0; i < 100; i++) {
-            this.createSpell();
-        }
-
-        // spawn a new random spell in intervals
-        setInterval(() => {
-            if (this.spells.length < 100) { // check if limit
-                this.createSpell();
-            }
-        }, 1000);
     }
 
     createSpell() {
-        let id = new Uint32Array(uuidv4(null, Buffer.from(new Uint32Array(1)), 0).buffer, 0, 1)[0];
+        let id = randomUint32();
         while (this.spells.find(spell => spell.id === id)) {
-            id = new Uint32Array(uuidv4(null, Buffer.from(new Uint32Array(1)), 0).buffer, 0, 1)[0];
+            id = randomUint32();
         }
         const spell = {
             x: Math.floor(Math.random() * (this.mapSize + 1)),
@@ -248,9 +241,9 @@ class Game {
     }
 
     addPlayer() {
-        let id = new Uint32Array(uuidv4(null, Buffer.from(new Uint32Array(1)), 0).buffer, 0, 1)[0];
+        let id = randomUint32();
         while (this.players.find(player => player.id === id)) {
-            id = new Uint32Array(uuidv4(null, Buffer.from(new Uint32Array(1)), 0).buffer, 0, 1)[0];
+            id = randomUint32();
         }
         const player = {
             id: id,
@@ -355,6 +348,11 @@ class Game {
             this.networkUpdates.combat.attacks.push(attack);
             this.combat.attacks.splice(this.combat.attacks.indexOf(attack), 1);
         });
+
+        // spawn a spell
+        if (this.spells.length < config.spellPerPlayer * this.players.length) {
+            this.createSpell();
+        }
     }
 
     sendNetworkUpdates() {
@@ -442,4 +440,4 @@ setInterval(function () {
             websocket.ping();
         }
     });
-}, 40000);
+}, 1000 * config.pingTime);
