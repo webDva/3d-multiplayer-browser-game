@@ -8,9 +8,12 @@
         "npm": "5.6.0"
     },
     "dependencies": {
+        "@node-minify/clean-css": "^4.0.5",
+        "@node-minify/core": "^4.0.5",
+        "@node-minify/google-closure-compiler": "^4.0.5",
+        "@node-minify/html-minifier": "^4.0.5",
         "express": "^4.16.4",
         "http": "0.0.0",
-        "path": "^0.12.7",
         "uws": "10.148.1"
     }
 }

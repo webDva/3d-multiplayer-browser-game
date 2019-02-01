@@ -3,16 +3,58 @@ const app = express();
 const httpServer = require('http').Server(app);
 const WebSocket = require('uws');
 const ws_server = new WebSocket.Server({ server: httpServer });
-const path = require('path');
 const crypto = require('crypto');
 
-const config = require('./config');
+const minify = require('@node-minify/core');
+const gcc = require('@node-minify/google-closure-compiler');
+const htmlMinifier = require('@node-minify/html-minifier');
+const cleanCSS = require('@node-minify/clean-css');
 
-app.use(express.static(path.join(__dirname, './client')));
+const config = require('./config.json');
+const env = require('./env.json')[process.env.NODE_ENV || 'development'];
+
+if (env.production) {
+    console.log('Server started in production mode.');
+
+    // the minification directory's name and location is "./minified"
+    minify({
+        compressor: gcc,
+        input: './client/game.js',
+        output: './minified/game.js', // it overwrites the file
+        sync: true,
+        callback: function (err, min) {
+            console.log('Javascript minification complete.');
+        }
+    });
+
+    minify({
+        compressor: htmlMinifier,
+        input: './client/index.html',
+        output: './minified/index.html',
+        callback: function (err, min) { }
+    });
+
+    minify({
+        compressor: cleanCSS,
+        input: './client/styles/style.css',
+        output: './minified/style.css',
+        callback: function (err, min) { }
+    });
+
+    app.get('/game.js', function (req, res) {
+        res.sendFile('game.js', { root: __dirname + '/minified' }, function (err) { });
+    }).get('/', function (req, res) {
+        res.sendFile('index.html', { root: __dirname + '/minified' }, function (err) { });
+    }).get('/styles/style.css', function (req, res) {
+        res.sendFile('style.css', { root: __dirname + '/minified' }, function (err) { });
+    });
+}
+
+app.use(express.static(__dirname + '/client'));
 
 const PORT = process.env.PORT || config.PORT;
 httpServer.listen(PORT, function () {
-    console.log('listening on port ' + PORT);
+    console.log(`HTTP server started on port ${PORT}.`);
 });
 
 function randomUint32() {
