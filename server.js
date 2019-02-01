@@ -27,6 +27,13 @@ function transmit(data, websocket) {
         websocket.send(data);
 }
 
+function transmitPlayer(data, player) { // for when the player's socket is not known
+    ws_server.clients.forEach(client => { // find the socket that the player belongs to
+        if (client.player === player && client.readyState === WebSocket.OPEN)
+            client.send(data);
+    });
+}
+
 function createBinaryFrame(id, segments, id_size = true) { // segments is a list of objects with type and value properties
     let segments_length = 0;
     segments.forEach(segment => {
@@ -342,11 +349,8 @@ class Game {
                     const player_spell = player.spells.find(s => s.attackNumber === spell.attackNumber);
                     player_spell.amount++;
                     this.spells.splice(this.spells.indexOf(spell), 1);
-                    ws_server.clients.forEach(client => { // find the socket that the player belongs to
-                        if (client.player === player && client.readyState === WebSocket.OPEN)
-                            client.send(createBinaryFrame(8, [{ type: 'Uint8', value: spell.attackNumber }]));
-                    });
-                    broadcast(createBinaryFrame(7, [{ type: 'Uint32', value: spell.id }]));
+                    transmitPlayer(createBinaryFrame(8, [{ type: 'Uint8', value: spell.attackNumber }]), player); // player receives a new spell
+                    broadcast(createBinaryFrame(7, [{ type: 'Uint32', value: spell.id }])); // a spell is now gone from the map
                 }
             });
         });
