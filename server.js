@@ -30,23 +30,21 @@ if (env.production) {
     minify({
         compressor: htmlMinifier,
         input: './client/index.html',
-        output: './minified/index.html',
-        callback: function (err, min) { }
+        output: './minified/index.html'
     });
 
     minify({
         compressor: cleanCSS,
         input: './client/styles/style.css',
-        output: './minified/style.css',
-        callback: function (err, min) { }
+        output: './minified/style.css'
     });
 
-    app.get('/game.js', function (req, res) {
-        res.sendFile('game.js', { root: __dirname + '/minified' }, function (err) { });
-    }).get('/', function (req, res) {
-        res.sendFile('index.html', { root: __dirname + '/minified' }, function (err) { });
+    app.get('/', function (req, res) {
+        res.sendFile('index.html', { root: __dirname + '/minified' });
+    }).get('/game.js', function (req, res) {
+        res.sendFile('game.js', { root: __dirname + '/minified' });
     }).get('/styles/style.css', function (req, res) {
-        res.sendFile('style.css', { root: __dirname + '/minified' }, function (err) { });
+        res.sendFile('style.css', { root: __dirname + '/minified' });
     });
 }
 
