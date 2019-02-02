@@ -29,8 +29,8 @@ class Client {
                 const arraybuffer = new ArrayBuffer(9);
                 const dataview = new DataView(arraybuffer);
                 dataview.setUint8(0, 1);
-                const max = 100;
-                const min = -100;
+                const max = 200;
+                const min = 0;
                 dataview.setFloat32(1, Math.floor(Math.random() * (max - min + 1) + min));
                 dataview.setFloat32(5, Math.floor(Math.random() * (max - min + 1) + min));
                 this.websocket.send(dataview);

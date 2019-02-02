@@ -7,7 +7,6 @@ BABYLON.Animation.AllowMatricesInterpolation = true;
 const scene = new BABYLON.Scene(engine);
 //scene.debugLayer.show();
 scene.clearColor = new BABYLON.Color3(1, 1, 1);
-scene.collisionsEnabled = true;
 
 const camera = new BABYLON.FollowCamera('camera', new BABYLON.Vector3(0, 0, 0), scene);
 //const camera = new BABYLON.ArcRotateCamera("Camera", 1, 1, 4, new BABYLON.Vector3(-10, 10, 20), scene);
@@ -19,14 +18,15 @@ light.specular = new BABYLON.Color3(0, 0, 0);
 light.groundColor = new BABYLON.Color3(0, 0, 0);
 
 // ground mesh
-const ground = BABYLON.Mesh.CreateGround("ground", 1000, 1000, 1, scene);
+const groundSize = 200;
+const ground = BABYLON.Mesh.CreateGround("ground", groundSize, groundSize, 1, scene);
+ground.setPivotMatrix(BABYLON.Matrix.Translation(groundSize / 2, 0, groundSize / 2), false);
 ground.KGAME_TYPE = 2; // 2 means that it can be navigated to
 ground.material = new BABYLON.GridMaterial('groundMaterial', scene);
 ground.material.mainColor = new BABYLON.Color3(1, 1, 1);
 ground.material.lineColor = new BABYLON.Color3(0, 0, 0);
 ground.material.gridRatio = 1;
 ground.material.majorUnitFrequency = 0;
-ground.checkCollisions = true;
 
 // highlight layer for highlighting meshes
 const targetSelectionHighlightLayer = new BABYLON.HighlightLayer("highlightlayer", scene);
