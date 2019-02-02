@@ -17,13 +17,14 @@ if (env.production) {
     console.log('Server started in production mode.');
 
     // the minification directory's name and location is "./minified"
+    console.log('Minifying the primary minification target...');
     minify({
         compressor: gcc,
         input: './client/game.js',
         output: './minified/game.js', // it overwrites the file
         sync: true,
         callback: function (err, min) {
-            console.log('Javascript minification complete.');
+            console.log('Primary minification complete.');
         }
     });
 
@@ -45,6 +46,8 @@ if (env.production) {
         res.sendFile('game.js', { root: __dirname + '/minified' });
     }).get('/styles/style.css', function (req, res) {
         res.sendFile('style.css', { root: __dirname + '/minified' });
+    }).get('/babylon.custom.js', function (req, res) {
+        res.sendFile('babylon.custom.min.js', { root: __dirname + '/client' });
     });
 }
 
