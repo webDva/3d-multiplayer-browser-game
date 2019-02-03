@@ -15,6 +15,11 @@ class Client {
                 const dataview = new DataView(event.data);
                 if (dataview.getUint8(0) === 3) {
                     this.session_started = true;
+                    connected++;
+                    console.log(`${connected} clients connected.`);
+                    if (connected == clients) {
+                        console.log(`All ${clients} clients connected at target URL ${env.testUrl} with a move rate of ${move_rate}.`);
+                    }
                 }
             }
         }
@@ -43,6 +48,8 @@ const clients = (process.argv.length > 2) ? process.argv[2] : 20;
 const move_rate = (process.argv.length > 3) ? process.argv[3] : 2500;
 // node testclients.js [clients_no] [move_rate_no]
 // for production: NODE_ENV=production node testclients.js [clients_no] [move_rate_no]
+
+let connected = 0;
 
 console.log(`${clients} clients connecting at a move rate of ${move_rate}.`);
 
