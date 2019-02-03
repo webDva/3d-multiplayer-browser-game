@@ -211,20 +211,17 @@ websocket.onmessage = (event) => {
 
         // a new spell has spawned
         if (dataview.getUint8(0) === 5) {
-            const spellID = dataview.getUint32(1);
-            const newSpell = spell_consumables.find(spell => spell.id === spellID);
-            if (!newSpell) {
-                const spawned_spell = BABYLON.MeshBuilder.CreateSphere('sphere', { diameter: 1 }, scene);
-                spawned_spell.KGAME_TYPE = 2;
-                spawned_spell.position = new BABYLON.Vector3(dataview.getFloat32(10), 1, dataview.getFloat32(6));
-                spawned_spell.material = new BABYLON.StandardMaterial('standardMaterial', scene);
-                spawned_spell.material.emissiveColor = new BABYLON.Color4(dataview.getUint8(5) & 1, dataview.getUint8(5) & 2, dataview.getUint8(5) & 3, 1);
-                spell_consumables.push({ mesh: spawned_spell, id: dataview.getUint32(1) });
-            }
+            const spawned_spell = BABYLON.MeshBuilder.CreateSphere('sphere', { diameter: 1 }, scene);
+            spawned_spell.KGAME_TYPE = 2;
+            spawned_spell.position = new BABYLON.Vector3(dataview.getFloat32(10), 1, dataview.getFloat32(6));
+            spawned_spell.material = new BABYLON.StandardMaterial('standardMaterial', scene);
+            spawned_spell.material.emissiveColor = new BABYLON.Color4(dataview.getUint8(5) & 1, dataview.getUint8(5) & 2, dataview.getUint8(5) & 3, 1);
+            spell_consumables.push({ mesh: spawned_spell, id: dataview.getUint32(1) });
         }
 
         // player disconnect
         if (dataview.getUint8(0) === 6) {
+            // player objects can be duplicated too,so this would actually need an array from Array.filter
             const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(1));
             player_object.mesh.dispose();
             player_list.splice(player_list.indexOf(player_object), 1);
@@ -232,11 +229,11 @@ websocket.onmessage = (event) => {
 
         // a spell has disappeared from the map
         if (dataview.getUint8(0) === 7) {
-            const findSpell = spell_consumables.find(spell => spell.id === dataview.getUint32(1));
-            if (findSpell && findSpell.mesh) { // doesn't function as required but this is a startup
-                findSpell.mesh.dispose();
-                spell_consumables.splice(spell_consumables.indexOf(findSpell), 1);
-            }
+            const findSpells = spell_consumables.filter(spell => spell.id === dataview.getUint32(1));
+            findSpells.forEach(spell => {
+                spell.mesh.dispose();
+                spell_consumables.splice(spell_consumables.indexOf(spell), 1);
+            });
         }
 
         // the player has recieved a new spell
