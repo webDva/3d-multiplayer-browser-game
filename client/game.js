@@ -53,6 +53,14 @@ function create_character(id, x, y, direction, type) {
     BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'kawaii.babylon', scene).then(function (imported) {
         const mesh = imported.meshes[0];
 
+        BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'bat.babylon', scene).then(function (imported2) {
+            const batMesh = imported2.meshes[0];
+            batMesh.attachToBone(mesh.skeleton.bones[9], mesh);
+            batMesh.rotation.x = -Math.PI / 2;
+            batMesh.position.z += 1;
+            batMesh.position.y += 2;
+        });
+
         if (type === 0) { // if an NPC
             mesh.material = new BABYLON.StandardMaterial('', scene);
             mesh.material.diffuseColor = BABYLON.Color3.Red();
@@ -65,6 +73,7 @@ function create_character(id, x, y, direction, type) {
         mesh.skeleton.animationPropertiesOverride.loopMode = 1;
         mesh.idleRange = mesh.skeleton.getAnimationRange('Idle');
         mesh.runRange = mesh.skeleton.getAnimationRange('Run');
+        mesh.attackRange = mesh.skeleton.getAnimationRange('Attack');
         mesh.idleRange.animation = scene.beginAnimation(mesh.skeleton, mesh.idleRange.from, mesh.idleRange.to, true, 1);
 
         mesh.KGAME_TYPE = 1; // KGAME_TYPE 1 means that it is a kawaii game mesh of type 1
@@ -194,6 +203,11 @@ scene.onPointerObservable.add(pointerInfo => {
             selectionCircleAnimation.setKeys([{ frame: 0, value: 0 }, { frame: 10, value: 2 * Math.PI }]);
             targetSelectionHighlightLayer.selectedMesh.selectionCircle.animations.push(selectionCircleAnimation);
             scene.beginAnimation(targetSelectionHighlightLayer.selectedMesh.selectionCircle, 0, 10, true);
+
+            // attack the target
+            scene.beginAnimation(player.mesh.skeleton, player.mesh.attackRange.from, player.mesh.attackRange.to, false, 0.25, function () {
+                player.mesh.idleRange.animation = scene.beginAnimation(player.mesh.skeleton, player.mesh.idleRange.from, player.mesh.idleRange.to, true, 1);
+            });
         }
     } else if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN && pointerInfo.pickInfo.pickedMesh.KGAME_TYPE === 2) {
         player.movement.isMoving = true;

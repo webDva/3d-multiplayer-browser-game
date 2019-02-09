@@ -314,7 +314,9 @@ class Game {
             isMoving: false,
             health: 100,
 
-            combat: {}
+            combat: {
+                aggro: [] // a list of player-aggro pairs
+            }
         };
 
         this.npcs.push(npc);
