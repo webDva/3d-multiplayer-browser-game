@@ -31,46 +31,6 @@ ground.material.majorUnitFrequency = 0;
 // highlight layer for highlighting meshes
 const targetSelectionHighlightLayer = new BABYLON.HighlightLayer("highlightlayer", scene);
 
-// particle system handling subsystem
-let particles = [];
-function create_particles(config, sourceMesh = null, targetMesh = null) { // config is a particle system configuration object
-    const particleSystem = new BABYLON.ParticleSystem('', config.number, scene);
-
-    // particle system configuration
-    particleSystem.particleTexture = new BABYLON.Texture(config.particleTexture, scene);
-    particleSystem.color1 = config.color1;
-    particleSystem.color2 = config.color2;
-    particleSystem.colorDead = config.colorDead;
-    particleSystem.minSize = config.minSize;
-    particleSystem.maxSize = config.maxSize;
-    particleSystem.minLifeTime = config.minLifeTime;
-    particleSystem.maxLifeTime = config.maxLifeTime;
-    particleSystem.emitRate = config.emitRate;
-    particleSystem.blendMode = config.blendMode;
-    particleSystem.gravity = config.gravity;
-    particleSystem.minEmitPower = config.minEmitPower;
-    particleSystem.maxEmitPower = config.maxEmitPower;
-    particleSystem.updateSpeed = config.updateSpeed;
-
-    switch (config.type) {
-        case 'Attack1':
-            particleSystem.emitter = new BABYLON.Vector3(sourceMesh.position.x, config.height, sourceMesh.position.z);
-            particleSystem.createSphereEmitter(config.sphereEmitterRadius);
-            particleSystem.movementSpeed = config.movementSpeed;
-            particleSystem.threshold = config.threshold;
-            break;
-        case 'Attack2':
-            particleSystem.emitter = new BABYLON.Vector3(targetMesh.position.x, config.height, targetMesh.position.z);
-            const hemisphericEmitter = particleSystem.createHemisphericEmitter(config.circleRadius);
-            hemisphericEmitter.radiusRange = 1;
-            break;
-    }
-
-    particleSystem.start();
-
-    return particleSystem;
-}
-
 const player = {
     id: null,
     mesh: null,
@@ -84,15 +44,10 @@ const player = {
     combat: {
         target: null,
         attack: null
-    },
-
-    spells: []
+    }
 };
 let player_list = [];
 let session_started = false;
-let attacker, target, isParticlesStarted = false;
-
-let spell_consumables = [];
 
 function create_player(id, x, y, direction) {
     BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'kawaii.babylon', scene).then(function (imported) {
@@ -131,30 +86,6 @@ function create_player(id, x, y, direction) {
     });
 }
 
-function attackClicked(attackNumber, attackElementID, counterElementID) {
-    const consumed_spell = player.spells.find(spell => spell.attackNumber === attackNumber);
-    if (player.combat.target && consumed_spell.amount > 0) {
-        player.combat.attack = attackNumber;
-        consumed_spell.amount--;
-        if (consumed_spell.amount === 0) {
-            const attackElement = document.getElementById(attackElementID);
-            attackElement.style.backgroundColor = 'rgba(50, 35, 70, 0.5)';
-        }
-        const counter = document.getElementById(counterElementID);
-        counter.innerText = consumed_spell.amount;
-    }
-}
-
-for (let i = 1; i <= 3; i++) {
-    document.getElementById(`attack-${i}`).onclick = function () {
-        attackClicked(i, `attack-${i}`, `counter-${i}`);
-    };
-}
-
-for (let i = 1; i <= 3; i++) {
-    player.spells.push({ attackNumber: i, amount: 0 });
-}
-
 // configure WebSocket client
 
 const websocket = new WebSocket(((window.location.protocol === 'https:') ? 'wss://' : 'ws://') + window.location.host);
@@ -171,9 +102,6 @@ websocket.onmessage = (event) => {
         // welcome message id sent to the player
         if (dataview.getUint8(0) === 3) {
             player.id = dataview.getUint32(1);
-
-            // display DOM user interface
-            document.getElementById('attack-buttons-container').style.display = 'flex';
 
             // request map data
             websocket.send(JSON.stringify({ type: 'request_map_data' }));
@@ -193,30 +121,13 @@ websocket.onmessage = (event) => {
 
         // attacks
         if (dataview.getUint8(0) === 2) {
-            attacker = player_list.find(player_object => player_object.id === dataview.getUint32(1));
-            target = player_list.find(player_object => player_object.id === dataview.getUint32(5));
-            if (dataview.getUint8(9) === 1) {
-                const particleSystem = create_particles(ParticlesConfiguration.Attack1Particles, attacker.mesh);
-                particles.push({ system: particleSystem, target: target, type: 'Attack1' });
-            } else if (dataview.getUint8(9) === 2) {
-                const particleSystem = create_particles(ParticlesConfiguration.Attack2Particles, null, target.mesh);
-                particles.push({ system: particleSystem, type: 'Attack2', time: Date.now() });
-            }
+            const attacker = player_list.find(player_object => player_object.id === dataview.getUint32(1));
+            const target = player_list.find(player_object => player_object.id === dataview.getUint32(5));
         }
 
         // new player joins
         if (dataview.getUint8(0) === 4) {
             create_player(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getFloat32(13));
-        }
-
-        // a new spell has spawned
-        if (dataview.getUint8(0) === 5) {
-            const spawned_spell = BABYLON.MeshBuilder.CreateSphere('sphere', { diameter: 1 }, scene);
-            spawned_spell.KGAME_TYPE = 2;
-            spawned_spell.position = new BABYLON.Vector3(dataview.getFloat32(10), 1, dataview.getFloat32(6));
-            spawned_spell.material = new BABYLON.StandardMaterial('standardMaterial', scene);
-            spawned_spell.material.emissiveColor = new BABYLON.Color4(dataview.getUint8(5) & 1, dataview.getUint8(5) & 2, dataview.getUint8(5) & 3, 1);
-            spell_consumables.push({ mesh: spawned_spell, id: dataview.getUint32(1) });
         }
 
         // player disconnect
@@ -225,28 +136,6 @@ websocket.onmessage = (event) => {
             const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(1));
             player_object.mesh.dispose();
             player_list.splice(player_list.indexOf(player_object), 1);
-        }
-
-        // a spell has disappeared from the map
-        if (dataview.getUint8(0) === 7) {
-            const findSpells = spell_consumables.filter(spell => spell.id === dataview.getUint32(1));
-            findSpells.forEach(spell => {
-                spell.mesh.dispose();
-                spell_consumables.splice(spell_consumables.indexOf(spell), 1);
-            });
-        }
-
-        // the player has recieved a new spell
-        if (dataview.getUint8(0) === 8) {
-            const attackNumber = dataview.getUint8(1);
-            const existingSpell = player.spells.find(spell_object => spell_object.attackNumber === attackNumber);
-            existingSpell.amount++;
-            const counter = document.getElementById(`counter-${attackNumber}`);
-            counter.innerText = existingSpell.amount;
-            if (existingSpell.amount === 1) {
-                const attackElement = document.getElementById(`attack-${attackNumber}`);
-                attackElement.style.backgroundColor = 'rgba(71, 67, 99, 1.0)';
-            }
         }
 
         // player healths update
@@ -340,7 +229,6 @@ setInterval(() => {
     if (player.combat.attack) {
         dataview.setUint8(0, 3);
         dataview.setUint32(1, player.combat.target);
-        dataview.setUint8(5, player.combat.attack);
         websocket.send(dataview);
         player.combat.attack = null;
     }
@@ -412,28 +300,7 @@ scene.registerBeforeRender(function () {
                 player_object.previousY = player_object.mesh.position.x;
             }
 
-            particles.forEach(particleSystem => {
-                if (particleSystem.type === 'Attack1') {
-                    if (!particleSystem.target) { // player disconnects before particle system is disposed
-                        particleSystem.system.stop();
-                        particles.splice(particles.indexOf(particleSystem), 1);
-                        return;
-                    }
-                    if (Math.abs(particleSystem.system.emitter.z - particleSystem.target.mesh.position.z) >= particleSystem.system.threshold || Math.abs(particleSystem.system.emitter.x - particleSystem.target.mesh.position.x) >= particleSystem.system.threshold) {
-                        const direction = Math.atan2(particleSystem.target.mesh.position.x - particleSystem.system.emitter.x, particleSystem.target.mesh.position.z - particleSystem.system.emitter.z);
-                        particleSystem.system.emitter.z += Math.cos(direction) * particleSystem.system.movementSpeed;
-                        particleSystem.system.emitter.x += Math.sin(direction) * particleSystem.system.movementSpeed;
-                    } else {
-                        particleSystem.system.stop();
-                        particles.splice(particles.indexOf(particleSystem), 1);
-                    }
-                } else if (particleSystem.type === 'Attack2') {
-                    if (Date.now() - particleSystem.time >= ParticlesConfiguration.Attack2Particles.ttl) {
-                        particleSystem.system.stop();
-                        particles.splice(particles.indexOf(particleSystem), 1);
-                    }
-                }
-            });
+            // combat would be processed here
         });
     }
 });

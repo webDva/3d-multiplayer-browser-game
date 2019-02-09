@@ -182,7 +182,7 @@ ws_server.on('connection', websocket => {
                 ]), websocket);
             }
 
-            // a player has requested map data such as players and spells on the map
+            // a player has requested map data such as players
             if (data.type === 'request_map_data') {
                 // send list of players
                 game.players.forEach(player => {
@@ -191,16 +191,6 @@ ws_server.on('connection', websocket => {
                         { type: 'Float32', value: player.x },
                         { type: 'Float32', value: player.y },
                         { type: 'Float32', value: player.direction }
-                    ]), websocket);
-                });
-
-                // send the spells of the map to the player
-                game.spells.forEach(spell => {
-                    transmit(createBinaryFrame(5, [
-                        { type: 'Uint32', value: spell.id },
-                        { type: 'Uint8', value: spell.attackNumber },
-                        { type: 'Float32', value: spell.x },
-                        { type: 'Float32', value: spell.y }
                     ]), websocket);
                 });
             }
@@ -227,11 +217,8 @@ ws_server.on('connection', websocket => {
             if (client_dataview.getUint8(0) === 3) {
                 const player = websocket.player;
                 const target = client_dataview.getUint32(1); // player ID or mob ID
-                const attack = client_dataview.getUint8(5); // attack type or ID, an unsigned byte
-                const player_spell = player.spells.find(spell => spell.attackNumber === attack);
-                if (player_spell && player_spell.amount > 0) {
-                    player_spell.amount--;
-                    game.combat.attacks.push({ attacker: player.id, target: target, attack: attack });
+                if (true) { // will do move legality processing here
+                    game.combat.attacks.push({ attacker: player.id, target: target });
                 }
             }
         }
@@ -254,33 +241,11 @@ class Game {
                 attacks: [],
                 deaths: [],
                 respawns: [] // or joins
-            },
-            spells: {
-                spawned: [],
-                collected: [] // an object of the spell and the player to give them their new spell
             }
         };
         this.combat = {
             attacks: []
         };
-        this.spells = [];
-    }
-
-    createSpell() {
-        let id = randomUint32();
-        while (this.spells.find(spell => spell.id === id)) {
-            id = randomUint32();
-        }
-        const spell = {
-            x: Math.floor(Math.random() * (this.mapSize + 1)),
-            y: Math.floor(Math.random() * (this.mapSize + 1)),
-
-            attackNumber: Math.floor(Math.random() * (2 - 1 + 1) + 1), // two spells for now
-            id: id
-        };
-
-        this.spells.push(spell);
-        this.networkUpdates.spells.spawned.push(spell);
     }
 
     addPlayer() {
@@ -313,12 +278,8 @@ class Game {
             isAlive: true,
             deathTime: 0,
 
-            spells: []
+            combat: {} // cooldowns, etc.
         };
-
-        for (let i = 1; i <= 3; i++) { // three spells for now
-            player.spells.push({ attackNumber: i, amount: 0 });
-        }
 
         this.players.push(player);
         return player;
@@ -347,55 +308,11 @@ class Game {
     }
 
     gameLogicLoop() {
-        let arraybuffer, dataview;
-
-        // respawn players and notify the connected players
-        // leaving this alone for now. it's so behind.
-        this.players.filter(player => {
-            if (!player.isAlive && Date.now() - player.deathTime >= 5000)
-                return true;
-        })
-            .forEach(player => {
-                player.isAlive = true;
-                player.x = 0;
-                player.y = 0;
-                player.health = 100;
-
-                // notify all players that the player has respawned
-                arraybuffer = new ArrayBuffer(1 + 4);
-                dataview = new DataView(arraybuffer);
-                dataview.setUint8(0, 4);
-                dataview.setUint32(1, player.id);
-                ws_server.clients.forEach(client => {
-                    if (client.readyState === WebSocket.OPEN)
-                        client.send(dataview);
-                });
-            });
-
-        // player collects spell consumables
-        this.players.forEach(player => {
-            // is this legal checks would need to be performed here
-
-            this.spells.forEach(spell => {
-                if (pointCircleCollision(spell, player)) {
-                    const player_spell = player.spells.find(s => s.attackNumber === spell.attackNumber);
-                    player_spell.amount++;
-                    this.spells.splice(this.spells.indexOf(spell), 1);
-                    this.networkUpdates.spells.collected.push({ spell: spell, player: player });
-                }
-            });
-        });
-
         // combat attacks
         this.combat.attacks.forEach(attack => {
             this.networkUpdates.combat.attacks.push(attack);
             this.combat.attacks.splice(this.combat.attacks.indexOf(attack), 1);
         });
-
-        // spawn a spell
-        if (this.spells.length < config.spellPerPlayer * this.players.length) {
-            this.createSpell();
-        }
     }
 
     sendNetworkUpdates() {
@@ -423,28 +340,9 @@ class Game {
         this.networkUpdates.combat.attacks.forEach(attack => {
             broadcast(createBinaryFrame(2, [
                 { type: 'Uint32', value: attack.attacker },
-                { type: 'Uint32', value: attack.target },
-                { type: 'Uint8', value: attack.attack }
+                { type: 'Uint32', value: attack.target }
             ]));
             this.networkUpdates.combat.attacks.splice(this.networkUpdates.combat.attacks.indexOf(attack), 1);
-        });
-
-        // send spells that have spawned
-        this.networkUpdates.spells.spawned.forEach(spell => {
-            broadcast(createBinaryFrame(5, [
-                { type: 'Uint32', value: spell.id },
-                { type: 'Uint8', value: spell.attackNumber },
-                { type: 'Float32', value: spell.x },
-                { type: 'Float32', value: spell.y }
-            ]));
-            this.networkUpdates.spells.spawned.splice(this.networkUpdates.spells.spawned.indexOf(spell), 1);
-        });
-
-        // send updates on spells that are now gone from the map
-        this.networkUpdates.spells.collected.forEach(spell_object => {
-            broadcast(createBinaryFrame(7, [{ type: 'Uint32', value: spell_object.spell.id }]));
-            transmitPlayer(createBinaryFrame(8, [{ type: 'Uint8', value: spell_object.spell.attackNumber }]), spell_object.player);
-            this.networkUpdates.spells.collected.splice(this.networkUpdates.spells.collected.indexOf(spell_object), 1);
         });
     }
 }

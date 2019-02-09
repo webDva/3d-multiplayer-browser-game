@@ -7,6 +7,5 @@
         "radius": 3
     },
     "mapSize": 200,
-    "pingTime": 40,
-    "spellPerPlayer": 75
+    "pingTime": 40
 }
