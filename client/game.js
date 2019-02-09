@@ -49,9 +49,14 @@ const player = {
 let player_list = [];
 let session_started = false;
 
-function create_player(id, x, y, direction) {
+function create_character(id, x, y, direction, type) {
     BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'kawaii.babylon', scene).then(function (imported) {
         const mesh = imported.meshes[0];
+
+        if (type === 0) { // if an NPC
+            mesh.material = new BABYLON.StandardMaterial('', scene);
+            mesh.material.diffuseColor = BABYLON.Color3.Red();
+        }
 
         // animation
         mesh.skeleton.animationPropertiesOverride = new BABYLON.AnimationPropertiesOverride();
@@ -71,7 +76,8 @@ function create_player(id, x, y, direction) {
             direction: direction,
             previousX: x,
             previousY: y,
-            health: 0
+            health: 0,
+            type: type
         });
         mesh.position.z = x;
         mesh.position.x = y;
@@ -127,7 +133,7 @@ websocket.onmessage = (event) => {
 
         // new player joins
         if (dataview.getUint8(0) === 4) {
-            create_player(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getFloat32(13));
+            create_character(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getFloat32(13), dataview.getInt8(17));
         }
 
         // player disconnect

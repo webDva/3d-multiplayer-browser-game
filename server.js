@@ -178,19 +178,21 @@ ws_server.on('connection', websocket => {
                     { type: 'Uint32', value: websocket.player.id },
                     { type: 'Float32', value: websocket.player.x },
                     { type: 'Float32', value: websocket.player.y },
-                    { type: 'Float32', value: websocket.player.direction }
+                    { type: 'Float32', value: websocket.player.direction },
+                    { type: 'Int8', value: 1 } // player type and not an NPC type
                 ]), websocket);
             }
 
             // a player has requested map data such as players
             if (data.type === 'request_map_data') {
-                // send list of players
-                game.players.forEach(player => {
+                // send list of players and NPCs
+                game.players.concat(game.npcs).forEach(character => {
                     transmit(createBinaryFrame(4, [
-                        { type: 'Uint32', value: player.id },
-                        { type: 'Float32', value: player.x },
-                        { type: 'Float32', value: player.y },
-                        { type: 'Float32', value: player.direction }
+                        { type: 'Uint32', value: character.id },
+                        { type: 'Float32', value: character.x },
+                        { type: 'Float32', value: character.y },
+                        { type: 'Float32', value: character.direction },
+                        { type: 'Int8', value: character.type ? 1 : 0 } // 1 if is a player and 0 if an NPC
                     ]), websocket);
                 });
             }
@@ -246,15 +248,18 @@ class Game {
         this.combat = {
             attacks: []
         };
+        this.npcs = [];
+        const npc = this.addNPC();
     }
 
     addPlayer() {
         let id = randomUint32();
-        while (this.players.find(player => player.id === id)) {
+        while (this.players.concat(this.npcs).find(character => character.id === id)) {
             id = randomUint32();
         }
         const player = {
             id: id,
+            type: true, // true for player and not NPC
 
             // physics movement and initial starting position
             x: Math.floor(Math.random() * (this.mapSize + 1)),
@@ -285,24 +290,55 @@ class Game {
         return player;
     }
 
+    addNPC() {
+        let id = randomUint32();
+        while (this.npcs.concat(this.players).find(character => character.id === id)) {
+            id = randomUint32();
+        }
+        const npc = {
+            id: id,
+            type: false, // not a player
+
+            // physics movement and initial starting position
+            x: Math.floor(Math.random() * (this.mapSize + 1)),
+            y: Math.floor(Math.random() * (this.mapSize + 1)),
+            movement_speed: config.player.defaultMovementSpeed, // shares player's movement for now
+
+            // should be shared with players--or not
+            radius: config.player.radius,
+            direction: Math.PI / 2,
+            velocityX: 0,
+            velocityY: 0,
+            targetX: 0,
+            targetY: 0,
+            isMoving: false,
+            health: 100,
+
+            combat: {}
+        };
+
+        this.npcs.push(npc);
+        return npc;
+    }
+
     physicsLoop() {
-        // player movement
-        this.players.filter(player => {
-            return player.isMoving;
+        // player and NPC movement
+        this.players.concat(this.npcs).filter(character => {
+            return character.isMoving;
         })
-            .filter(player => { // collision detection
+            .filter(character => { // collision detection
                 // for now, there is no collision detection
                 return true;
             })
-            .forEach(player => {
+            .forEach(character => {
                 const threshold = 1;
-                if (Math.abs(player.x - player.targetX) <= threshold && Math.abs(player.y - player.targetY) <= threshold) {
-                    player.velocityX = 0;
-                    player.velocityY = 0;
-                    player.isMoving = false;
+                if (Math.abs(character.x - character.targetX) <= threshold && Math.abs(character.y - character.targetY) <= threshold) {
+                    character.velocityX = 0;
+                    character.velocityY = 0;
+                    character.isMoving = false;
                 } else {
-                    player.x += player.movement_speed * Math.cos(player.direction);
-                    player.y += player.movement_speed * Math.sin(player.direction);
+                    character.x += character.movement_speed * Math.cos(character.direction);
+                    character.y += character.movement_speed * Math.sin(character.direction);
                 }
             });
     }
@@ -316,27 +352,28 @@ class Game {
     }
 
     sendNetworkUpdates() {
-        // send player orientations
+        // send player and NPC orientations
         let orientations = [];
-        orientations.push({ type: 'Uint8', value: this.players.length });
-        this.players.forEach(player => {
-            orientations.push({ type: 'Uint32', value: player.id });
-            orientations.push({ type: 'Float32', value: player.x });
-            orientations.push({ type: 'Float32', value: player.y });
-            orientations.push({ type: 'Float32', value: player.direction });
+        orientations.push({ type: 'Uint8', value: this.players.length + this.npcs.length });
+        this.players.concat(this.npcs).forEach(character => {
+            orientations.push({ type: 'Uint32', value: character.id });
+            orientations.push({ type: 'Float32', value: character.x });
+            orientations.push({ type: 'Float32', value: character.y });
+            orientations.push({ type: 'Float32', value: character.direction });
         });
         broadcast(createBinaryFrame(1, orientations));
 
-        // send player healths
+        // send character healths
         let healths = [];
-        healths.push({ type: 'Uint8', value: this.players.length });
-        this.players.forEach(player => {
-            healths.push({ type: 'Uint32', value: player.id });
-            healths.push({ type: 'Int32', value: player.health });
+        healths.push({ type: 'Uint8', value: this.players.length + this.npcs.length });
+        this.players.concat(this.npcs).forEach(character => {
+            healths.push({ type: 'Uint32', value: character.id });
+            healths.push({ type: 'Int32', value: character.health });
         });
         broadcast(createBinaryFrame(9, healths));
 
-        // send attacks that players performed
+        // send attacks that characters performed
+        // since NPCs are here now, will need to send attack types
         this.networkUpdates.combat.attacks.forEach(attack => {
             broadcast(createBinaryFrame(2, [
                 { type: 'Uint32', value: attack.attacker },
