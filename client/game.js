@@ -8,7 +8,7 @@ const scene = new BABYLON.Scene(engine);
 //scene.debugLayer.show();
 scene.clearColor = new BABYLON.Color3(1, 1, 1);
 
-const camera = new BABYLON.FollowCamera('camera', new BABYLON.Vector3(0, 0, 0), scene);
+const camera = new BABYLON.UniversalCamera('camera', new BABYLON.Vector3(0, 0, 0), scene);
 //const camera = new BABYLON.ArcRotateCamera("Camera", 1, 1, 4, new BABYLON.Vector3(-10, 10, 20), scene);
 camera.attachControl(canvas, false);
 
@@ -16,17 +16,6 @@ const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, -100,
 light.diffuse = new BABYLON.Color3(1, 1, 1);
 light.specular = new BABYLON.Color3(0, 0, 0);
 light.groundColor = new BABYLON.Color3(0, 0, 0);
-
-// ground mesh
-const groundSize = 200;
-const ground = BABYLON.Mesh.CreateGround("ground", groundSize, groundSize, 1, scene);
-ground.setPivotMatrix(BABYLON.Matrix.Translation(groundSize / 2, 0, groundSize / 2), false);
-ground.KGAME_TYPE = 2; // 2 means that it can be navigated to
-ground.material = new BABYLON.GridMaterial('groundMaterial', scene);
-ground.material.mainColor = new BABYLON.Color3(1, 1, 1);
-ground.material.lineColor = new BABYLON.Color3(0, 0, 0);
-ground.material.gridRatio = 1;
-ground.material.majorUnitFrequency = 0;
 
 // highlight layer for highlighting meshes
 const targetSelectionHighlightLayer = new BABYLON.HighlightLayer("highlightlayer", scene);
@@ -49,17 +38,9 @@ const player = {
 let player_list = [];
 let session_started = false;
 
-function create_character(id, x, y, direction, type) {
+function create_character(id, x, y, z, eulerX, eulerY, eulerZ, type) {
     BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'kawaii.babylon', scene).then(function (imported) {
         const mesh = imported.meshes[0];
-
-        BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'bat.babylon', scene).then(function (imported2) {
-            const batMesh = imported2.meshes[0];
-            batMesh.attachToBone(mesh.skeleton.bones[9], mesh);
-            batMesh.rotation.x = -Math.PI / 2;
-            batMesh.position.z += 1;
-            batMesh.position.y += 2;
-        });
 
         if (type === 0) { // if an NPC
             mesh.material = new BABYLON.StandardMaterial('', scene);
@@ -81,19 +62,20 @@ function create_character(id, x, y, direction, type) {
             id: id,
             x: x,
             y: y,
+            z: z,
             mesh: mesh,
-            direction: direction,
-            previousX: x,
-            previousY: y,
+            eulerX: eulerX,
+            eulerY: eulerY,
+            eulerZ: eulerZ,
             health: 0,
             type: type
         });
         mesh.position.z = x;
         mesh.position.x = y;
+        mesh.position.z = z;
 
         if (player.id === id) {
             player.mesh = mesh;
-            camera.lockedTarget = player.mesh;
             //camera.target = player.mesh;
 
             session_started = true;
@@ -125,11 +107,14 @@ websocket.onmessage = (event) => {
         // player orientations
         if (dataview.getUint8(0) === 1) {
             for (let i = 0; i < dataview.getUint8(1); i++) {
-                const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(2 + i * 16));
+                const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(2 + i * 28));
                 if (player_object) {
-                    player_object.x = dataview.getFloat32(6 + i * 16);
-                    player_object.y = dataview.getFloat32(10 + i * 16);
-                    player_object.direction = dataview.getFloat32(14 + i * 16);
+                    player_object.x = dataview.getFloat32(6 + i * 28);
+                    player_object.y = dataview.getFloat32(10 + i * 28);
+                    player_object.z = dataview.getFloat32(14 + i * 28);
+                    player_object.eulerX = dataview.getFloat32(18 + i * 28);
+                    player_object.eulerY = dataview.getFloat32(22 + i * 28);
+                    player_object.eulerZ = dataview.getFloat32(26 + i * 28);
                 }
             }
         }
@@ -142,7 +127,7 @@ websocket.onmessage = (event) => {
 
         // new player joins
         if (dataview.getUint8(0) === 4) {
-            create_character(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getFloat32(13), dataview.getInt8(17));
+            create_character(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getFloat32(13), dataview.getFloat32(17), dataview.getFloat32(21), dataview.getFloat32(25), dataview.getInt8(29));
         }
 
         // player disconnect
@@ -174,61 +159,29 @@ websocket.onopen = () => {
     websocket.send(JSON.stringify({ type: 'join' }));
 };
 
-scene.onPointerObservable.add(pointerInfo => {
-    if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN && pointerInfo.pickInfo.pickedMesh && pointerInfo.pickInfo.pickedMesh.KGAME_TYPE === 1) {
-        const player_object = player_list.find(player_object => player_object.mesh === pointerInfo.pickInfo.pickedMesh);
-        if (targetSelectionHighlightLayer.selectedMesh === player_object.mesh) { // de-select or de-highlight if already selected
-            targetSelectionHighlightLayer.removeMesh(targetSelectionHighlightLayer.selectedMesh);
-            targetSelectionHighlightLayer.selectedMesh.selectionCircle.dispose();
-            targetSelectionHighlightLayer.selectedMesh = null;
-            player.combat.target = null;
-        } else {
-            if (targetSelectionHighlightLayer.selectedMesh) { // remove previous highlight and selection circle underneath
-                targetSelectionHighlightLayer.selectedMesh.selectionCircle.dispose();
-                targetSelectionHighlightLayer.removeMesh(targetSelectionHighlightLayer.selectedMesh);
-            }
-            player.combat.target = player_object.id;
-            // highlight object mesh
-            targetSelectionHighlightLayer.selectedMesh = player_object.mesh;
-            targetSelectionHighlightLayer.addMesh(player_object.mesh, new BABYLON.Color4(1, 0, 1, 1));
-            // selection circle
-            targetSelectionHighlightLayer.selectedMesh.selectionCircle = BABYLON.Mesh.CreateDisc('selectionCircle', 5, 12, scene);
-            targetSelectionHighlightLayer.selectedMesh.selectionCircle.material = new BABYLON.StandardMaterial('standardmaterial', scene);
-            targetSelectionHighlightLayer.selectedMesh.selectionCircle.material.emissiveColor = new BABYLON.Color4(1, 0, 1, 1);
-            targetSelectionHighlightLayer.selectedMesh.selectionCircle.parent = targetSelectionHighlightLayer.selectedMesh;
-            targetSelectionHighlightLayer.selectedMesh.selectionCircle.position.y = 0.25;
-            targetSelectionHighlightLayer.selectedMesh.selectionCircle.rotation.x = Math.PI / 2;
-            // selection circle animation
-            const selectionCircleAnimation = new BABYLON.Animation('selectionCircle', 'rotation.y', 1, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
-            selectionCircleAnimation.setKeys([{ frame: 0, value: 0 }, { frame: 10, value: 2 * Math.PI }]);
-            targetSelectionHighlightLayer.selectedMesh.selectionCircle.animations.push(selectionCircleAnimation);
-            scene.beginAnimation(targetSelectionHighlightLayer.selectedMesh.selectionCircle, 0, 10, true);
+for (let i = 0; i < 1000; i++) {
+    const dummy = BABYLON.MeshBuilder.CreateBox("box", { diameter: 20 }, scene);
+    dummy.position.x = Math.floor(Math.random() * (200 + 1));
+    dummy.position.y = Math.floor(Math.random() * (200 + 1));
+    dummy.position.z = Math.floor(Math.random() * (200 + 1));
+    dummy.material = new BABYLON.StandardMaterial("standardmaterial", scene);
+}
 
-            // attack the target
-            scene.beginAnimation(player.mesh.skeleton, player.mesh.attackRange.from, player.mesh.attackRange.to, false, 0.25, function () {
-                player.mesh.idleRange.animation = scene.beginAnimation(player.mesh.skeleton, player.mesh.idleRange.from, player.mesh.idleRange.to, true, 1);
-            });
-        }
-    } else if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN && pointerInfo.pickInfo.pickedMesh.KGAME_TYPE === 2) {
-        player.movement.isMoving = true;
-        player.movement.x = pointerInfo.pickInfo.pickedPoint.z;
-        player.movement.y = pointerInfo.pickInfo.pickedPoint.x;
-        // destination circle
-        const destinationCircle = BABYLON.Mesh.CreateDisc('destinationCircle', 0, 32, scene);
-        destinationCircle.material = new BABYLON.StandardMaterial('standardmaterial', scene);
-        destinationCircle.material.emissiveColor = new BABYLON.Color3(0.5, 0.5, 0.5);
-        destinationCircle.position = new BABYLON.Vector3(player.movement.y, 0.25, player.movement.x);
-        destinationCircle.rotation.x = Math.PI / 2;
-        // animation for the destination circle
-        const destinationCircleAnimation = new BABYLON.Animation('destinationCircleAnimation', 'scaling', 300, BABYLON.Animation.ANIMATIONTYPE_VECTOR3, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
-        destinationCircleAnimation.setKeys([{ frame: 0, value: new BABYLON.Vector3(0, 0, 0) }, { frame: 50, value: new BABYLON.Vector3(3, 3, 3) }, { frame: 100, value: new BABYLON.Vector3(0, 0, 0) }]);
-        const destinationCircleEasingFunction = new BABYLON.BounceEase(10, 20);
-        destinationCircleEasingFunction.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
-        destinationCircleAnimation.setEasingFunction(destinationCircleEasingFunction);
-        destinationCircle.animations.push(destinationCircleAnimation);
-        scene.beginAnimation(destinationCircle, 100, 0, false, 1, function () {
-            destinationCircle.dispose();
-        });
+document.addEventListener('keydown', function (event) {
+    const arraybuffer = new ArrayBuffer(20);
+    const dataview = new DataView(arraybuffer);
+    const char = String.fromCharCode(event.keyCode);
+    switch (char) {
+        case 'W':
+            dataview.setUint8(0, 1);
+            dataview.setUint8(1, 1);
+            websocket.send(dataview);
+            break;
+        case 'F':
+            dataview.setUint8(0, 1);
+            dataview.setUint8(1, 0);
+            websocket.send(dataview);
+            break;
     }
 });
 
@@ -241,8 +194,7 @@ setInterval(() => {
     if (player.movement.isMoving) {
         player.movement.isMoving = false;
         dataview.setUint8(0, 1);
-        dataview.setFloat32(1, player.movement.x);
-        dataview.setFloat32(5, player.movement.y);
+        dataview.setUint8(1, 1);
         websocket.send(dataview);
     }
 
@@ -268,17 +220,26 @@ setInterval(() => {
         // player orientations
         if (deltaTime <= lerpTime) { // lerp
             player_list.forEach(player_object => {
-                player_object.mesh.position.z = lerp(player_object.mesh.position.z, player_object.x, deltaTime / lerpTime);
-                player_object.mesh.position.x = lerp(player_object.mesh.position.x, player_object.y, deltaTime / lerpTime);
-                player_object.mesh.rotation.y = lerp(player_object.mesh.rotation.y, player_object.direction, deltaTime / lerpTime);
+                player_object.mesh.position.x = lerp(player_object.mesh.position.x, player_object.x, deltaTime / lerpTime);
+                player_object.mesh.position.y = lerp(player_object.mesh.position.y, player_object.y, deltaTime / lerpTime);
+                player_object.mesh.position.z = lerp(player_object.mesh.position.z, player_object.z, deltaTime / lerpTime);
+                // player_object.mesh.rotation.x = lerp(player_object.mesh.rotation.x, player_object.eulerX, deltaTime / lerpTime);
+                // player_object.mesh.rotation.y = lerp(player_object.mesh.rotation.y, player_object.eulerY, deltaTime / lerpTime);
+                // player_object.mesh.rotation.z = lerp(player_object.mesh.rotation.z, player_object.eulerZ, deltaTime / lerpTime);
             });
         } else { // don't lerp
             player_list.forEach(player_object => {
-                player_object.mesh.position.z = player_object.x;
-                player_object.mesh.position.x = player_object.y;
-                player_object.mesh.rotation.y = player_object.direction;
+                player_object.mesh.position.x = player_object.x;
+                player_object.mesh.position.y = player_object.y;
+                player_object.mesh.position.z = player_object.z;
             });
         }
+        // for now
+        player_list.forEach(player_object => {
+            player_object.mesh.rotation.x = player_object.eulerX;
+            player_object.mesh.rotation.y = player_object.eulerY;
+            player_object.mesh.rotation.z = player_object.eulerZ;
+        });
     }
 
     lastUpdateTime = Date.now();
@@ -287,41 +248,10 @@ setInterval(() => {
 // mostly for game logic and animation stuff
 scene.registerBeforeRender(function () {
     if (session_started) {
-        camera.position.x = player.mesh.position.x + 25;
-        camera.position.y = player.mesh.position.y + 25;
-        camera.position.z = player.mesh.position.z - 25;
-
-        // movement animations
-        player_list.forEach(player_object => {
-            if (player_object.previousX != player_object.mesh.position.z || player_object.previousY != player_object.mesh.position.x) {
-                if (!player_object.mesh.runRange.isRunning) {
-                    player_object.mesh.runRange.isRunning = true;
-                    player_object.mesh.idleRange.isRunning = false;
-                    player_object.mesh.idleRange.animation.stop();
-                    player_object.mesh.runRange.animation = scene.beginAnimation(player_object.mesh.skeleton, player_object.mesh.runRange.from, player_object.mesh.runRange.to, true, 1);
-                }
-            } else {
-                if (!player_object.mesh.idleRange.isRunning) {
-                    player_object.mesh.idleRange.isRunning = true;
-                    player_object.mesh.runRange.isRunning = false;
-                    if (player_object.mesh.runRange.animation)
-                        player_object.mesh.runRange.animation.stop();
-                    player_object.mesh.idleRange.animation = scene.beginAnimation(player_object.mesh.skeleton, player_object.mesh.idleRange.from, player_object.mesh.idleRange.to, true, 1);
-                }
-            }
-
-            const deltaTime = engine.getDeltaTime();
-            const lerpFactor = 40;
-            if (deltaTime <= lerpFactor) {
-                player_object.previousX = lerp(player_object.previousX, player_object.mesh.position.z, deltaTime / lerpFactor);
-                player_object.previousY = lerp(player_object.previousY, player_object.mesh.position.x, deltaTime / lerpFactor);
-            } else {
-                player_object.previousX = player_object.mesh.position.z;
-                player_object.previousY = player_object.mesh.position.x;
-            }
-
-            // combat would be processed here
-        });
+        camera.position = new BABYLON.Vector3(player.mesh.position.x, player.mesh.position.y, player.mesh.position.z);
+        camera.rotation.x = player.mesh.rotation.x;
+        camera.rotation.y = player.mesh.rotation.y;
+        camera.rotation.z = player.mesh.rotation.z;
     }
 });
 

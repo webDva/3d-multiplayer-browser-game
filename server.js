@@ -178,7 +178,10 @@ ws_server.on('connection', websocket => {
                     { type: 'Uint32', value: websocket.player.id },
                     { type: 'Float32', value: websocket.player.x },
                     { type: 'Float32', value: websocket.player.y },
-                    { type: 'Float32', value: websocket.player.direction },
+                    { type: 'Float32', value: websocket.player.z },
+                    { type: 'Float32', value: websocket.player.eulerX },
+                    { type: 'Float32', value: websocket.player.eulerY },
+                    { type: 'Float32', value: websocket.player.eulerZ },
                     { type: 'Int8', value: 1 } // player type and not an NPC type
                 ]), websocket);
             }
@@ -191,7 +194,10 @@ ws_server.on('connection', websocket => {
                         { type: 'Uint32', value: character.id },
                         { type: 'Float32', value: character.x },
                         { type: 'Float32', value: character.y },
-                        { type: 'Float32', value: character.direction },
+                        { type: 'Float32', value: character.z },
+                        { type: 'Float32', value: character.eulerX },
+                        { type: 'Float32', value: character.eulerY },
+                        { type: 'Float32', value: character.eulerZ },
                         { type: 'Int8', value: character.type ? 1 : 0 } // 1 if is a player and 0 if an NPC
                     ]), websocket);
                 });
@@ -204,15 +210,17 @@ ws_server.on('connection', websocket => {
             // player movement
             if (client_dataview.getUint8(0) === 1) {
                 const player = websocket.player;
-                player.isMoving = true;
-                // change the player's direction
-                player.direction = Math.atan2(client_dataview.getFloat32(5) - player.y, client_dataview.getFloat32(1) - player.x);
-                // change the player's target destination
-                player.targetX = client_dataview.getFloat32(1);
-                player.targetY = client_dataview.getFloat32(5);
-                // change the player's velocity
-                player.velocityX = Math.cos(player.direction) * player.movement_speed;
-                player.velocityY = Math.sin(player.direction) * player.movement_speed;
+                if (client_dataview.getUint8(1) === 1) {
+                    player.isMoving = true;
+                    let transposedViewMatrix = transposeMatrix(player.viewMatrix, 4, 4);
+                    const normalized = normalize([player.eulerX, player.eulerY, player.eulerZ]);
+                    transposedViewMatrix[0][2] = normalized[0];
+                    transposedViewMatrix[1][2] = normalized[1];
+                    transposedViewMatrix[2][2] = normalized[2];
+                    player.viewMatrix = transposeMatrix(transposedViewMatrix, 4, 4);
+                } else if (client_dataview.getUint8(1) === 0) {
+                    player.isMoving = false;
+                }
             }
 
             // player is attacking someone or something
@@ -249,7 +257,7 @@ class Game {
             attacks: []
         };
         this.npcs = [];
-        const npc = this.addNPC();
+        //const npc = this.addNPC();
     }
 
     addPlayer() {
@@ -257,26 +265,39 @@ class Game {
         while (this.players.concat(this.npcs).find(character => character.id === id)) {
             id = randomUint32();
         }
+        const x = Math.floor(Math.random() * (this.mapSize + 1));
+        const y = Math.floor(Math.random() * (this.mapSize + 1));
+        const z = Math.floor(Math.random() * (this.mapSize + 1));
+        let viewMatrix = createMatrix(4, 4);
+        const positionVector = [x, y, z, 1];
+        for (let i = 0; i < 4; i++) {
+            viewMatrix[3][i] = positionVector[i];
+        }
+        const eulerX = (Math.random() * (Math.PI * 2)).toFixed(4);
+        const eulerY = (Math.random() * (Math.PI * 2)).toFixed(4);
+        const eulerZ = (Math.random() * (Math.PI * 2)).toFixed(4);
         const player = {
             id: id,
             type: true, // true for player and not NPC
 
-            // physics movement and initial starting position
-            x: Math.floor(Math.random() * (this.mapSize + 1)),
-            y: Math.floor(Math.random() * (this.mapSize + 1)),
-            movement_speed: config.player.defaultMovementSpeed,
+            viewMatrix: viewMatrix, // camera view matrix
+
+            // initial orientation
+            x: x,
+            y: y,
+            z: z,
+            eulerX: eulerX,
+            eulerY: eulerY,
+            eulerZ: eulerZ,
+
+            movement_speed: config.player.defaultMovementSpeed, // speed will be a ratio of the throttle speed and character maximum movement speed
 
             // collision
             radius: config.player.radius,
 
-            direction: 0, // direction for attacking and avatar facing, in radians
+            throttleSetting: 0,
 
-            // for click-to-move
-            velocityX: 0,
-            velocityY: 0,
-            targetX: 0,
-            targetY: 0,
-            isMoving: false,
+            isMoving: false, // will be removed later. for now, determines if the client toggled movement on or off
 
             health: 100, // has to be a signed 32-bit integer for negative health values
 
@@ -333,15 +354,25 @@ class Game {
                 return true;
             })
             .forEach(character => {
-                const threshold = 1;
-                if (Math.abs(character.x - character.targetX) <= threshold && Math.abs(character.y - character.targetY) <= threshold) {
-                    character.velocityX = 0;
-                    character.velocityY = 0;
-                    character.isMoving = false;
-                } else {
-                    character.x += character.movement_speed * Math.cos(character.direction);
-                    character.y += character.movement_speed * Math.sin(character.direction);
+                let viewMatrix = transposeMatrix(character.viewMatrix, 4, 4);
+
+                const forwardVector = [viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2], viewMatrix[3][2]];
+                for (let i = 0; i < 3; i++) {
+                    viewMatrix[i][3] += forwardVector[i] * character.movement_speed;
                 }
+
+                const rotationMatrix = transposeMatrix(generateRotationMatrixFromEuler([character.eulerX, character.eulerY, character.eulerZ]), 4, 4);
+                let transformationMatrix = multiplyMatrices(viewMatrix, 4, 4, rotationMatrix, 4, 4);
+
+                character.x = transformationMatrix[0][3];
+                character.y = transformationMatrix[1][3];
+                character.z = transformationMatrix[2][3];
+
+                // for (let i = 0; i < 3; i++) {
+                //     transformationMatrix[i][2] += forwardVector[i] * character.movement_speed;
+                // }
+
+                character.viewMatrix = transposeMatrix(transformationMatrix, 4, 4);
             });
     }
 
@@ -361,7 +392,10 @@ class Game {
             orientations.push({ type: 'Uint32', value: character.id });
             orientations.push({ type: 'Float32', value: character.x });
             orientations.push({ type: 'Float32', value: character.y });
-            orientations.push({ type: 'Float32', value: character.direction });
+            orientations.push({ type: 'Float32', value: character.z });
+            orientations.push({ type: 'Float32', value: character.eulerX });
+            orientations.push({ type: 'Float32', value: character.eulerY });
+            orientations.push({ type: 'Float32', value: character.eulerZ });
         });
         broadcast(createBinaryFrame(1, orientations));
 
@@ -386,12 +420,98 @@ class Game {
     }
 }
 
-function pointCircleCollision(point, circle) {
-    if (Math.sqrt(Math.pow(point.x - circle.x, 2) + Math.pow(point.y - circle.y, 2)) <= circle.radius) {
-        return true;
-    } else {
-        return false;
+function createMatrix(rows, columns) {
+    let matrix = [];
+    for (let i = 0; i < rows; i++) {
+        matrix[i] = [];
+        for (let j = 0; j < columns; j++) {
+            matrix[i][j] = 0;
+        }
     }
+    return matrix;
+}
+
+function transposeMatrix(matrix, rows, columns) {
+    let newMatrix = createMatrix(rows, columns);
+    for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < columns; j++) {
+            newMatrix[j][i] = matrix[i][j];
+        }
+    }
+    return newMatrix;
+}
+
+function normalize(vector) {
+    const magnitude = Math.sqrt(Math.pow(vector[0], 2) + Math.pow(vector[1], 2) + Math.pow(vector[2], 2));
+    if (magnitude > 0) {
+        return [vector[0] / magnitude, vector[1] / magnitude, vector[2] / magnitude];
+    } else {
+        return [0, 0, 0];
+    }
+}
+
+function multiplyMatrices(A, rowsA, columnsA, B, rowsB, columnsB) {
+    if (columnsA !== rowsB) {
+        return null;
+    }
+    let newMatrix = createMatrix(rowsA, columnsB);
+    for (let i = 0; i < rowsA; i++) {
+        for (let j = 0; j < columnsB; j++) {
+            for (let k = 0; k < columnsA; k++) {
+                newMatrix[i][j] = A[i][k] * B[k][j];
+            }
+        }
+    }
+    return newMatrix;
+}
+
+function generateXRotationMatrix(angle) {
+    let matrix = createMatrix(4, 4);
+    matrix = transposeMatrix(matrix, 4, 4);
+    fillColumnVector(matrix, 0, [1, 0, 0, 0]);
+    fillColumnVector(matrix, 1, [0, Math.cos(angle), Math.sin(angle), 0]);
+    fillColumnVector(matrix, 2, [0, -Math.sin(angle), Math.cos(angle), 0]);
+    fillColumnVector(matrix, 3, [0, 0, 0, 1]);
+    matrix = transposeMatrix(matrix, 4, 4);
+    return matrix;
+}
+
+function generateYRotationMatrix(angle) {
+    let matrix = createMatrix(4, 4);
+    matrix = transposeMatrix(matrix, 4, 4);
+    fillColumnVector(matrix, 0, [Math.cos(angle), 0, -Math.sin(angle), 0]);
+    fillColumnVector(matrix, 1, [0, 1, 0, 0]);
+    fillColumnVector(matrix, 2, [Math.sin(angle), 0, Math.cos(angle), 0]);
+    fillColumnVector(matrix, 3, [0, 0, 0, 1]);
+    matrix = transposeMatrix(matrix, 4, 4);
+    return matrix;
+}
+
+function generateZRotationMatrix(angle) {
+    let matrix = createMatrix(4, 4);
+    matrix = transposeMatrix(matrix, 4, 4);
+    fillColumnVector(matrix, 0, [Math.cos(angle), Math.sin(angle), 0, 0]);
+    fillColumnVector(matrix, 1, [-Math.sin(angle), Math.cos(angle), 0, 0]);
+    fillColumnVector(matrix, 2, [0, 0, 1, 0]);
+    fillColumnVector(matrix, 3, [0, 0, 0, 1]);
+    matrix = transposeMatrix(matrix, 4, 4);
+    return matrix;
+}
+
+// has to be transposed to column major
+function fillColumnVector(transposedColumnMajorMatrix, column, columnVectorArray) {
+    for (let i = 0; i < 4; i++) {
+        transposedColumnMajorMatrix[column][i] = columnVectorArray[i];
+    }
+}
+
+function generateRotationMatrixFromEuler(eulerVectorArray) {
+    const xRotationMatrix = generateXRotationMatrix(eulerVectorArray[0]);
+    const yRotationMatrix = generateYRotationMatrix(eulerVectorArray[1]);
+    const zRotationMatrix = generateZRotationMatrix(eulerVectorArray[2]);
+    const xyRotationMatrix = multiplyMatrices(xRotationMatrix, 4, 4, yRotationMatrix, 4, 4);
+    const finalRotationMatrix = multiplyMatrices(xyRotationMatrix, 4, 4, zRotationMatrix, 4, 4);
+    return finalRotationMatrix;
 }
 
 const game = new Game();
