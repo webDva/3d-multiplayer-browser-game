@@ -212,12 +212,6 @@ ws_server.on('connection', websocket => {
                 const player = websocket.player;
                 if (client_dataview.getUint8(1) === 1) {
                     player.isMoving = true;
-                    let transposedViewMatrix = transposeMatrix(player.viewMatrix, 4, 4);
-                    const normalized = normalize([player.eulerX, player.eulerY, player.eulerZ]);
-                    transposedViewMatrix[0][2] = normalized[0];
-                    transposedViewMatrix[1][2] = normalized[1];
-                    transposedViewMatrix[2][2] = normalized[2];
-                    player.viewMatrix = transposeMatrix(transposedViewMatrix, 4, 4);
                 } else if (client_dataview.getUint8(1) === 0) {
                     player.isMoving = false;
                 }
@@ -265,17 +259,19 @@ class Game {
         while (this.players.concat(this.npcs).find(character => character.id === id)) {
             id = randomUint32();
         }
-        const x = Math.floor(Math.random() * (this.mapSize + 1));
-        const y = Math.floor(Math.random() * (this.mapSize + 1));
-        const z = Math.floor(Math.random() * (this.mapSize + 1));
-        let viewMatrix = createMatrix(4, 4);
-        const positionVector = [x, y, z, 1];
-        for (let i = 0; i < 4; i++) {
-            viewMatrix[3][i] = positionVector[i];
-        }
-        const eulerX = (Math.random() * (Math.PI * 2)).toFixed(4);
-        const eulerY = (Math.random() * (Math.PI * 2)).toFixed(4);
-        const eulerZ = (Math.random() * (Math.PI * 2)).toFixed(4);
+        const x = Math.random() * (this.mapSize + 1);
+        const y = Math.random() * (this.mapSize + 1);
+        const z = Math.random() * (this.mapSize + 1);
+
+        const eulerX = Math.random() * (Math.PI * 2);
+        const eulerY = Math.random() * (Math.PI * 2);
+        const eulerZ = Math.random() * (Math.PI * 2);
+
+        const rotationMatrix = generateRotationMatrixFromEuler([eulerX, eulerY, eulerZ]);
+        const translationMatrix = createTranslationMatrix([x, y, z, 1]);
+        const transformationMatrix = multiplyMatrices(translationMatrix, 4, 4, rotationMatrix, 4, 4);
+        const viewMatrix = transposeMatrix(transformationMatrix, 4, 4);
+
         const player = {
             id: id,
             type: true, // true for player and not NPC
@@ -354,24 +350,22 @@ class Game {
                 return true;
             })
             .forEach(character => {
-                let viewMatrix = transposeMatrix(character.viewMatrix, 4, 4);
-
-                const forwardVector = [viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2], viewMatrix[3][2]];
-                for (let i = 0; i < 3; i++) {
-                    viewMatrix[i][3] += forwardVector[i] * character.movement_speed;
-                }
-
-                const rotationMatrix = transposeMatrix(generateRotationMatrixFromEuler([character.eulerX, character.eulerY, character.eulerZ]), 4, 4);
+                // rotate the character
+                const rotationMatrix = generateRotationMatrixFromEuler([character.eulerX, character.eulerY, character.eulerZ]);
+                const viewMatrix = transposeMatrix(character.viewMatrix, 4, 4);
                 let transformationMatrix = multiplyMatrices(viewMatrix, 4, 4, rotationMatrix, 4, 4);
 
+                // translate the character
+                const forwardVector = normalize([transformationMatrix[0][2], transformationMatrix[1][2], transformationMatrix[2][2]]);
+                const translationMatrix = createTranslationMatrix([forwardVector[0] * character.movement_speed, forwardVector[1] * character.movement_speed, forwardVector[2] * character.movement_speed, 1]);
+                transformationMatrix = multiplyMatrices(transformationMatrix, 4, 4, translationMatrix, 4, 4);
+
+                // update the character's position using the transformation matrix
                 character.x = transformationMatrix[0][3];
                 character.y = transformationMatrix[1][3];
                 character.z = transformationMatrix[2][3];
 
-                // for (let i = 0; i < 3; i++) {
-                //     transformationMatrix[i][2] += forwardVector[i] * character.movement_speed;
-                // }
-
+                // update the character's camera-view matrix
                 character.viewMatrix = transposeMatrix(transformationMatrix, 4, 4);
             });
     }
@@ -441,10 +435,10 @@ function transposeMatrix(matrix, rows, columns) {
     return newMatrix;
 }
 
-function normalize(vector) {
-    const magnitude = Math.sqrt(Math.pow(vector[0], 2) + Math.pow(vector[1], 2) + Math.pow(vector[2], 2));
+function normalize(vectorArray) {
+    const magnitude = Math.sqrt(Math.pow(vectorArray[0], 2) + Math.pow(vectorArray[1], 2) + Math.pow(vectorArray[2], 2));
     if (magnitude > 0) {
-        return [vector[0] / magnitude, vector[1] / magnitude, vector[2] / magnitude];
+        return [vectorArray[0] / magnitude, vectorArray[1] / magnitude, vectorArray[2] / magnitude];
     } else {
         return [0, 0, 0];
     }
@@ -458,7 +452,7 @@ function multiplyMatrices(A, rowsA, columnsA, B, rowsB, columnsB) {
     for (let i = 0; i < rowsA; i++) {
         for (let j = 0; j < columnsB; j++) {
             for (let k = 0; k < columnsA; k++) {
-                newMatrix[i][j] = A[i][k] * B[k][j];
+                newMatrix[i][j] += A[i][k] * B[k][j];
             }
         }
     }
@@ -466,45 +460,50 @@ function multiplyMatrices(A, rowsA, columnsA, B, rowsB, columnsB) {
 }
 
 function generateXRotationMatrix(angle) {
+    // prevent gimbal lock
+    const threshold = 85;
+    const degrees = angle * 180 / Math.PI;
+    if (degrees > threshold) {
+        angle = threshold * Math.PI / 180;
+    } else if (degrees < -threshold) {
+        angle = -threshold * Math.PI / 180;
+    }
+
     let matrix = createMatrix(4, 4);
-    matrix = transposeMatrix(matrix, 4, 4);
     fillColumnVector(matrix, 0, [1, 0, 0, 0]);
     fillColumnVector(matrix, 1, [0, Math.cos(angle), Math.sin(angle), 0]);
     fillColumnVector(matrix, 2, [0, -Math.sin(angle), Math.cos(angle), 0]);
     fillColumnVector(matrix, 3, [0, 0, 0, 1]);
-    matrix = transposeMatrix(matrix, 4, 4);
     return matrix;
 }
 
 function generateYRotationMatrix(angle) {
     let matrix = createMatrix(4, 4);
-    matrix = transposeMatrix(matrix, 4, 4);
     fillColumnVector(matrix, 0, [Math.cos(angle), 0, -Math.sin(angle), 0]);
     fillColumnVector(matrix, 1, [0, 1, 0, 0]);
     fillColumnVector(matrix, 2, [Math.sin(angle), 0, Math.cos(angle), 0]);
     fillColumnVector(matrix, 3, [0, 0, 0, 1]);
-    matrix = transposeMatrix(matrix, 4, 4);
     return matrix;
 }
 
 function generateZRotationMatrix(angle) {
     let matrix = createMatrix(4, 4);
-    matrix = transposeMatrix(matrix, 4, 4);
     fillColumnVector(matrix, 0, [Math.cos(angle), Math.sin(angle), 0, 0]);
     fillColumnVector(matrix, 1, [-Math.sin(angle), Math.cos(angle), 0, 0]);
     fillColumnVector(matrix, 2, [0, 0, 1, 0]);
     fillColumnVector(matrix, 3, [0, 0, 0, 1]);
-    matrix = transposeMatrix(matrix, 4, 4);
     return matrix;
 }
 
-// has to be transposed to column major
-function fillColumnVector(transposedColumnMajorMatrix, column, columnVectorArray) {
+function fillColumnVector(columnMajorMatrix, column, columnVectorArray) {
     for (let i = 0; i < 4; i++) {
-        transposedColumnMajorMatrix[column][i] = columnVectorArray[i];
+        columnMajorMatrix[i][column] = columnVectorArray[i];
     }
 }
 
+/**
+ * @return {[][]} Column-major rotation matrix.
+ */
 function generateRotationMatrixFromEuler(eulerVectorArray) {
     const xRotationMatrix = generateXRotationMatrix(eulerVectorArray[0]);
     const yRotationMatrix = generateYRotationMatrix(eulerVectorArray[1]);
@@ -512,6 +511,31 @@ function generateRotationMatrixFromEuler(eulerVectorArray) {
     const xyRotationMatrix = multiplyMatrices(xRotationMatrix, 4, 4, yRotationMatrix, 4, 4);
     const finalRotationMatrix = multiplyMatrices(xyRotationMatrix, 4, 4, zRotationMatrix, 4, 4);
     return finalRotationMatrix;
+}
+
+/**
+ * 
+ * @param {[Number, Number, Number, 1]} positionVector - [x, y, z, 1]
+ * @return {[][]} Column-major translation matrix.
+ */
+function createTranslationMatrix(positionVector) {
+    let translationMatrix = createIdentityMatrix(4);
+    fillColumnVector(translationMatrix, 3, [positionVector[0], positionVector[1], positionVector[2], positionVector[3]]);
+    return translationMatrix;
+}
+
+function createIdentityMatrix(size) {
+    let matrix = createMatrix(size, size);
+
+    for (let i = 0; i < size; i++) {
+        for (let j = 0; j < size; j++) {
+            if (i === j) {
+                matrix[i][j] = 1;
+            }
+        }
+    }
+
+    return matrix;
 }
 
 const game = new Game();

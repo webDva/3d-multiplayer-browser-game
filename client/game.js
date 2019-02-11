@@ -223,9 +223,9 @@ setInterval(() => {
                 player_object.mesh.position.x = lerp(player_object.mesh.position.x, player_object.x, deltaTime / lerpTime);
                 player_object.mesh.position.y = lerp(player_object.mesh.position.y, player_object.y, deltaTime / lerpTime);
                 player_object.mesh.position.z = lerp(player_object.mesh.position.z, player_object.z, deltaTime / lerpTime);
-                // player_object.mesh.rotation.x = lerp(player_object.mesh.rotation.x, player_object.eulerX, deltaTime / lerpTime);
-                // player_object.mesh.rotation.y = lerp(player_object.mesh.rotation.y, player_object.eulerY, deltaTime / lerpTime);
-                // player_object.mesh.rotation.z = lerp(player_object.mesh.rotation.z, player_object.eulerZ, deltaTime / lerpTime);
+                player_object.mesh.rotation.x = lerp(player_object.mesh.rotation.x, player_object.eulerX, deltaTime / lerpTime);
+                player_object.mesh.rotation.y = lerp(player_object.mesh.rotation.y, player_object.eulerY, deltaTime / lerpTime);
+                player_object.mesh.rotation.z = lerp(player_object.mesh.rotation.z, player_object.eulerZ, deltaTime / lerpTime);
             });
         } else { // don't lerp
             player_list.forEach(player_object => {
@@ -234,12 +234,6 @@ setInterval(() => {
                 player_object.mesh.position.z = player_object.z;
             });
         }
-        // for now
-        player_list.forEach(player_object => {
-            player_object.mesh.rotation.x = player_object.eulerX;
-            player_object.mesh.rotation.y = player_object.eulerY;
-            player_object.mesh.rotation.z = player_object.eulerZ;
-        });
     }
 
     lastUpdateTime = Date.now();
