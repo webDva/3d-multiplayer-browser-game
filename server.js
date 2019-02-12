@@ -263,20 +263,13 @@ class Game {
         const y = Math.random() * (this.mapSize + 1);
         const z = Math.random() * (this.mapSize + 1);
 
-        const eulerX = Math.random() * (Math.PI * 2);
+        const eulerX = Math.random() * 1.3;
         const eulerY = Math.random() * (Math.PI * 2);
         const eulerZ = Math.random() * (Math.PI * 2);
-
-        const rotationMatrix = generateRotationMatrixFromEuler([eulerX, eulerY, eulerZ]);
-        const translationMatrix = createTranslationMatrix([x, y, z, 1]);
-        const transformationMatrix = multiplyMatrices(translationMatrix, 4, 4, rotationMatrix, 4, 4);
-        const viewMatrix = transposeMatrix(transformationMatrix, 4, 4);
 
         const player = {
             id: id,
             type: true, // true for player and not NPC
-
-            viewMatrix: viewMatrix, // camera view matrix
 
             // initial orientation
             x: x,
@@ -350,23 +343,14 @@ class Game {
                 return true;
             })
             .forEach(character => {
-                // rotate the character
-                const rotationMatrix = generateRotationMatrixFromEuler([character.eulerX, character.eulerY, character.eulerZ]);
-                const viewMatrix = transposeMatrix(character.viewMatrix, 4, 4);
-                let transformationMatrix = multiplyMatrices(viewMatrix, 4, 4, rotationMatrix, 4, 4);
+                const rotationMatrix = generateRotationMatrixFromEuler(character.eulerX, character.eulerY, character.eulerZ);
+                const forwardVector = [rotationMatrix[0][2], rotationMatrix[1][2], rotationMatrix[2][2]];
+                const translationMatrix = createTranslationMatrix(forwardVector[0] * character.movement_speed, forwardVector[1] * character.movement_speed, forwardVector[2] * character.movement_speed);
+                const transformationMatrix = multiplyMatrices(translationMatrix, 4, 4, rotationMatrix, 4, 4);
 
-                // translate the character
-                const forwardVector = normalize([transformationMatrix[0][2], transformationMatrix[1][2], transformationMatrix[2][2]]);
-                const translationMatrix = createTranslationMatrix([forwardVector[0] * character.movement_speed, forwardVector[1] * character.movement_speed, forwardVector[2] * character.movement_speed, 1]);
-                transformationMatrix = multiplyMatrices(transformationMatrix, 4, 4, translationMatrix, 4, 4);
-
-                // update the character's position using the transformation matrix
-                character.x = transformationMatrix[0][3];
-                character.y = transformationMatrix[1][3];
-                character.z = transformationMatrix[2][3];
-
-                // update the character's camera-view matrix
-                character.viewMatrix = transposeMatrix(transformationMatrix, 4, 4);
+                character.x += transformationMatrix[0][3];
+                character.y += transformationMatrix[1][3];
+                character.z += transformationMatrix[2][3];
             });
     }
 
@@ -435,10 +419,10 @@ function transposeMatrix(matrix, rows, columns) {
     return newMatrix;
 }
 
-function normalize(vectorArray) {
-    const magnitude = Math.sqrt(Math.pow(vectorArray[0], 2) + Math.pow(vectorArray[1], 2) + Math.pow(vectorArray[2], 2));
+function normalize(x, y, z) {
+    const magnitude = Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2) + Math.pow(z, 2));
     if (magnitude > 0) {
-        return [vectorArray[0] / magnitude, vectorArray[1] / magnitude, vectorArray[2] / magnitude];
+        return [x / magnitude, y / magnitude, z / magnitude];
     } else {
         return [0, 0, 0];
     }
@@ -504,23 +488,28 @@ function fillColumnVector(columnMajorMatrix, column, columnVectorArray) {
 /**
  * @return {[][]} Column-major rotation matrix.
  */
-function generateRotationMatrixFromEuler(eulerVectorArray) {
-    const xRotationMatrix = generateXRotationMatrix(eulerVectorArray[0]);
-    const yRotationMatrix = generateYRotationMatrix(eulerVectorArray[1]);
-    const zRotationMatrix = generateZRotationMatrix(eulerVectorArray[2]);
-    const xyRotationMatrix = multiplyMatrices(xRotationMatrix, 4, 4, yRotationMatrix, 4, 4);
-    const finalRotationMatrix = multiplyMatrices(xyRotationMatrix, 4, 4, zRotationMatrix, 4, 4);
-    return finalRotationMatrix;
+function generateRotationMatrixFromEuler(X, Y, Z, reverse = false) {
+    const xRotationMatrix = generateXRotationMatrix(X);
+    const yRotationMatrix = generateYRotationMatrix(Y);
+    const zRotationMatrix = generateZRotationMatrix(Z);
+
+    if (reverse) {
+        const zyRotationMatrix = multiplyMatrices(zRotationMatrix, 4, 4, yRotationMatrix, 4, 4);
+        const finalRotationMatrix = multiplyMatrices(zyRotationMatrix, 4, 4, xRotationMatrix, 4, 4);
+        return finalRotationMatrix;
+    } else {
+        const xyRotationMatrix = multiplyMatrices(xRotationMatrix, 4, 4, yRotationMatrix, 4, 4);
+        const finalRotationMatrix = multiplyMatrices(xyRotationMatrix, 4, 4, zRotationMatrix, 4, 4);
+        return finalRotationMatrix;
+    }
 }
 
 /**
- * 
- * @param {[Number, Number, Number, 1]} positionVector - [x, y, z, 1]
  * @return {[][]} Column-major translation matrix.
  */
-function createTranslationMatrix(positionVector) {
+function createTranslationMatrix(x, y, z) {
     let translationMatrix = createIdentityMatrix(4);
-    fillColumnVector(translationMatrix, 3, [positionVector[0], positionVector[1], positionVector[2], positionVector[3]]);
+    fillColumnVector(translationMatrix, 3, [x, y, z, 1]);
     return translationMatrix;
 }
 

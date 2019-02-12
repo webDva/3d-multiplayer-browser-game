@@ -5,7 +5,10 @@ const engine = new BABYLON.Engine(canvas, true, { stencil: true });
 BABYLON.Animation.AllowMatricesInterpolation = true;
 
 const scene = new BABYLON.Scene(engine);
+
+// comment out when not using
 //scene.debugLayer.show();
+
 scene.clearColor = new BABYLON.Color3(1, 1, 1);
 
 const camera = new BABYLON.UniversalCamera('camera', new BABYLON.Vector3(0, 0, 0), scene);
@@ -242,10 +245,8 @@ setInterval(() => {
 // mostly for game logic and animation stuff
 scene.registerBeforeRender(function () {
     if (session_started) {
-        camera.position = new BABYLON.Vector3(player.mesh.position.x, player.mesh.position.y, player.mesh.position.z);
-        camera.rotation.x = player.mesh.rotation.x;
-        camera.rotation.y = player.mesh.rotation.y;
-        camera.rotation.z = player.mesh.rotation.z;
+        camera.position = player.mesh.position;
+        camera.rotation = player.mesh.rotation;
     }
 });
 
