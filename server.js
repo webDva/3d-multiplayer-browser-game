@@ -494,20 +494,14 @@ function fillColumnVector(columnMajorMatrix, column, columnVectorArray) {
 /**
  * @return {[][]} Column-major rotation matrix.
  */
-function generateRotationMatrixFromEuler(X, Y, Z, reverse = false) {
+function generateRotationMatrixFromEuler(X, Y, Z) {
     const xRotationMatrix = generateXRotationMatrix(X);
     const yRotationMatrix = generateYRotationMatrix(Y);
     const zRotationMatrix = generateZRotationMatrix(Z);
 
-    if (reverse) {
-        const zyRotationMatrix = multiplyMatrices(zRotationMatrix, 4, 4, yRotationMatrix, 4, 4);
-        const finalRotationMatrix = multiplyMatrices(zyRotationMatrix, 4, 4, xRotationMatrix, 4, 4);
-        return finalRotationMatrix;
-    } else {
-        const xyRotationMatrix = multiplyMatrices(xRotationMatrix, 4, 4, yRotationMatrix, 4, 4);
-        const finalRotationMatrix = multiplyMatrices(xyRotationMatrix, 4, 4, zRotationMatrix, 4, 4);
-        return finalRotationMatrix;
-    }
+    const xyRotationMatrix = multiplyMatrices(xRotationMatrix, 4, 4, yRotationMatrix, 4, 4);
+    const finalRotationMatrix = multiplyMatrices(xyRotationMatrix, 4, 4, zRotationMatrix, 4, 4);
+    return finalRotationMatrix;
 }
 
 /**
