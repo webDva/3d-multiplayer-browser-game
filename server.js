@@ -267,6 +267,12 @@ class Game {
         const eulerY = Math.random() * (Math.PI * 2);
         const eulerZ = Math.random() * (Math.PI * 2);
 
+        // construct initial view matrix and then rotate it to obtain the forward facing Euler angle direction
+        const initialViewMatrix = createTranslationMatrix(x, y, z);
+        const rotationMatrix = generateRotationMatrixFromEuler(eulerX, eulerY, eulerZ);
+        const transformationMatrix = multiplyMatrices(rotationMatrix, 4, 4, initialViewMatrix, 4, 4);
+        const forwardVector = [transformationMatrix[0][2], transformationMatrix[1][2], transformationMatrix[2][2]];
+
         const player = {
             id: id,
             type: true, // true for player and not NPC
@@ -275,9 +281,9 @@ class Game {
             x: x,
             y: y,
             z: z,
-            eulerX: eulerX,
-            eulerY: eulerY,
-            eulerZ: eulerZ,
+            eulerX: forwardVector[0],
+            eulerY: forwardVector[1],
+            eulerZ: forwardVector[2],
 
             movement_speed: config.player.defaultMovementSpeed, // speed will be a ratio of the throttle speed and character maximum movement speed
 
