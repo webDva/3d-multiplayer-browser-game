@@ -42,3 +42,11 @@ html, body {
     border-radius: 50%;
     background-color: rgba(45, 42, 49, 0.3);
 }
+
+#crosshair {
+    position: absolute;
+    height: 10px;
+    width: 10px;
+    border-radius: 50%;
+    background-color: blueviolet;
+}

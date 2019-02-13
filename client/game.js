@@ -166,6 +166,11 @@ websocket.onmessage = (event) => {
 }
 
 // display DOM user interface
+const uiCrosshair = document.getElementById('crosshair');
+uiCrosshair.style.display = 'block';
+uiCrosshair.style.left = window.innerWidth / 2 - uiCrosshair.getBoundingClientRect().width / 2 + 'px';
+uiCrosshair.style.top = window.innerHeight / 2 - uiCrosshair.getBoundingClientRect().height / 2 + 'px';
+
 const uiJoystick = document.getElementById('joystick');
 uiJoystick.style.display = 'block';
 
@@ -174,10 +179,10 @@ function rotatePlayer(eventClientX, eventClientY) {
     const x = eventClientX - joystickPositionInfo.width / 2;
     const y = eventClientY - joystickPositionInfo.height / 2;
 
-    player.movement.isRotating = true;
     player.movement.eulerX = player.struct.eulerX + y * 0.01;
     player.movement.eulerZ = player.struct.eulerZ - x * 0.01;
     player.movement.eulerY = player.struct.eulerY;
+    player.movement.isRotating = true;
 
     const thumbstick = document.getElementById('thumbstick');
     thumbstick.style.display = 'block';
@@ -302,4 +307,6 @@ engine.runRenderLoop(function () {
 
 window.addEventListener("resize", function () {
     engine.resize();
+    uiCrosshair.style.left = window.innerWidth / 2 - uiCrosshair.getBoundingClientRect().width / 2 + 'px';
+    uiCrosshair.style.top = window.innerHeight / 2 - uiCrosshair.getBoundingClientRect().height / 2 + 'px';
 });

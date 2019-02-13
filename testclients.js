@@ -31,13 +31,14 @@ class Client {
         setInterval(() => {
             if (this.session_started) {
                 // move in a random direction
-                const arraybuffer = new ArrayBuffer(9);
+                const arraybuffer = new ArrayBuffer(13);
                 const dataview = new DataView(arraybuffer);
                 dataview.setUint8(0, 1);
-                const max = 200;
+                const max = Math.PI * 2;
                 const min = 0;
                 dataview.setFloat32(1, Math.floor(Math.random() * (max - min + 1) + min));
                 dataview.setFloat32(5, Math.floor(Math.random() * (max - min + 1) + min));
+                dataview.setFloat32(9, Math.floor(Math.random() * (max - min + 1) + min));
                 this.websocket.send(dataview);
             }
         }, move_rate);
