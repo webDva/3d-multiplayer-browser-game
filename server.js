@@ -163,7 +163,7 @@ function createBinaryFrame(id, segments, id_size = true) { // segments is a list
 ws_server.on('connection', websocket => {
     websocket.isAlive = true; // create this property for the sake of implementing ping-pong heartbeats
 
-    websocket.player = game.addPlayer();
+    websocket.player = game.addCharacter();
 
     websocket.on('message', message => {
         if (typeof message === 'string') {
@@ -210,11 +210,14 @@ ws_server.on('connection', websocket => {
             // player movement
             if (client_dataview.getUint8(0) === 1) {
                 const player = websocket.player;
-                if (client_dataview.getUint8(1) === 1) {
-                    player.isMoving = true;
-                } else if (client_dataview.getUint8(1) === 0) {
-                    player.isMoving = false;
-                }
+
+                const eulerX = client_dataview.getFloat32(1);
+                const eulerY = client_dataview.getFloat32(5);
+                const eulerZ = client_dataview.getFloat32(9);
+
+                player.eulerX = preventGimbalLock(clampAngle(eulerX));
+                player.eulerY = clampAngle(eulerY);
+                player.eulerZ = clampAngle(eulerZ);
             }
 
             // player is attacking someone or something
@@ -254,28 +257,26 @@ class Game {
         //const npc = this.addNPC();
     }
 
-    addPlayer() {
+    addCharacter(isHumanPlayer = true) {
         let id = randomUint32();
         while (this.players.concat(this.npcs).find(character => character.id === id)) {
             id = randomUint32();
         }
-        const x = Math.random() * (this.mapSize + 1);
+        const x = Math.random() * (this.mapSize + 1); // make these numbers negative for the spherical map
         const y = Math.random() * (this.mapSize + 1);
         const z = Math.random() * (this.mapSize + 1);
 
-        const eulerX = Math.random() * 1.3;
-        const eulerY = Math.random() * (Math.PI * 2);
-        const eulerZ = Math.random() * (Math.PI * 2);
+        const eulerX = Math.random() * Math.PI * 2; // the rotation matrix generation function will mutate the X euler angle into a forward vector component
+        const eulerY = Math.random() * Math.PI * 2;
+        const eulerZ = Math.random() * Math.PI * 2;
 
-        // construct initial view matrix and then rotate it to obtain the forward facing Euler angle direction
-        const initialViewMatrix = createTranslationMatrix(x, y, z);
+        // construct rotation matrix to obtain the forward facing Euler angle direction
         const rotationMatrix = generateRotationMatrixFromEuler(eulerX, eulerY, eulerZ);
-        const transformationMatrix = multiplyMatrices(rotationMatrix, 4, 4, initialViewMatrix, 4, 4);
-        const forwardVector = [transformationMatrix[0][2], transformationMatrix[1][2], transformationMatrix[2][2]];
+        const forwardVector = [rotationMatrix[0][2], rotationMatrix[1][2], rotationMatrix[2][2]];
 
-        const player = {
+        const character = {
             id: id,
-            type: true, // true for player and not NPC
+            type: isHumanPlayer, // true for player and false for NPC. TODO: create additional logic for NPCs inside this function
 
             // initial orientation
             x: x,
@@ -285,14 +286,13 @@ class Game {
             eulerY: forwardVector[1],
             eulerZ: forwardVector[2],
 
-            movement_speed: config.player.defaultMovementSpeed, // speed will be a ratio of the throttle speed and character maximum movement speed
+            //movement_speed: config.player.defaultMovementSpeed, // speed will be a ratio of the throttle speed and character maximum movement speed
+            movement_speed: 0.1,
 
             // collision
             radius: config.player.radius,
 
             throttleSetting: 0,
-
-            isMoving: false, // will be removed later. for now, determines if the client toggled movement on or off
 
             health: 100, // has to be a signed 32-bit integer for negative health values
 
@@ -302,8 +302,8 @@ class Game {
             combat: {} // cooldowns, etc.
         };
 
-        this.players.push(player);
-        return player;
+        this.players.push(character); // list name will change
+        return character;
     }
 
     addNPC() {
@@ -341,22 +341,17 @@ class Game {
 
     physicsLoop() {
         // player and NPC movement
-        this.players.concat(this.npcs).filter(character => {
-            return character.isMoving;
+        this.players.concat(this.npcs).filter(character => { // collision detection
+            // for now, there is no collision detection
+            return true;
         })
-            .filter(character => { // collision detection
-                // for now, there is no collision detection
-                return true;
-            })
             .forEach(character => {
                 const rotationMatrix = generateRotationMatrixFromEuler(character.eulerX, character.eulerY, character.eulerZ);
                 const forwardVector = [rotationMatrix[0][2], rotationMatrix[1][2], rotationMatrix[2][2]];
-                const translationMatrix = createTranslationMatrix(forwardVector[0] * character.movement_speed, forwardVector[1] * character.movement_speed, forwardVector[2] * character.movement_speed);
-                const transformationMatrix = multiplyMatrices(translationMatrix, 4, 4, rotationMatrix, 4, 4);
 
-                character.x += transformationMatrix[0][3];
-                character.y += transformationMatrix[1][3];
-                character.z += transformationMatrix[2][3];
+                character.x += forwardVector[0] * character.movement_speed;
+                character.y += forwardVector[1] * character.movement_speed;
+                character.z += forwardVector[2] * character.movement_speed;
             });
     }
 
@@ -450,15 +445,7 @@ function multiplyMatrices(A, rowsA, columnsA, B, rowsB, columnsB) {
 }
 
 function generateXRotationMatrix(angle) {
-    // prevent gimbal lock
-    const threshold = 85;
-    const degrees = angle * 180 / Math.PI;
-    if (degrees > threshold) {
-        angle = threshold * Math.PI / 180;
-    } else if (degrees < -threshold) {
-        angle = -threshold * Math.PI / 180;
-    }
-
+    angle = preventGimbalLock(angle);
     let matrix = createMatrix(4, 4);
     fillColumnVector(matrix, 0, [1, 0, 0, 0]);
     fillColumnVector(matrix, 1, [0, Math.cos(angle), Math.sin(angle), 0]);
@@ -502,6 +489,22 @@ function generateRotationMatrixFromEuler(X, Y, Z) {
     const xyRotationMatrix = multiplyMatrices(xRotationMatrix, 4, 4, yRotationMatrix, 4, 4);
     const finalRotationMatrix = multiplyMatrices(xyRotationMatrix, 4, 4, zRotationMatrix, 4, 4);
     return finalRotationMatrix;
+}
+
+function clampAngle(angle) {
+    if (angle >= Math.PI * 2 || angle < 0) {
+        angle = Math.abs(angle % (Math.PI * 2)); // absolute value of the remainder
+    }
+    return angle;
+}
+
+function preventGimbalLock(angle) {
+    const X_ANGLE_THRESHOLD = 89;
+    const degrees = angle * 180 / Math.PI;
+    if (degrees > X_ANGLE_THRESHOLD) {
+        angle = X_ANGLE_THRESHOLD * Math.PI / 180;
+    }
+    return angle;
 }
 
 /**

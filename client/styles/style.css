@@ -23,3 +23,22 @@ html, body {
     justify-content: center;
     align-items: center;
 }
+
+#joystick {
+    height: 200px;
+    width: 200px;
+    border: 4px solid black;
+    border-radius: 50%;
+    background-color: rgba(50, 35, 70, 0.5);
+}
+
+#thumbstick {
+    display: none;
+    position: absolute;
+    pointer-events: none;
+    height: 100px;
+    width: 100px;
+    border: 2px solid gray;
+    border-radius: 50%;
+    background-color: rgba(45, 42, 49, 0.3);
+}

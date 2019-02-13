@@ -26,11 +26,14 @@ const targetSelectionHighlightLayer = new BABYLON.HighlightLayer("highlightlayer
 const player = {
     id: null,
     mesh: null,
+    struct: null,
 
     movement: {
-        isMoving: false,
-        x: 0,
-        y: 0
+        isRotating: false,
+        // requested orientation
+        eulerX: 0,
+        eulerY: 0,
+        eulerZ: 0
     },
 
     combat: {
@@ -61,7 +64,7 @@ function create_character(id, x, y, z, eulerX, eulerY, eulerZ, type) {
         mesh.idleRange.animation = scene.beginAnimation(mesh.skeleton, mesh.idleRange.from, mesh.idleRange.to, true, 1);
 
         mesh.KGAME_TYPE = 1; // KGAME_TYPE 1 means that it is a kawaii game mesh of type 1
-        player_list.push({
+        const player_struct = {
             id: id,
             x: x,
             y: y,
@@ -72,7 +75,8 @@ function create_character(id, x, y, z, eulerX, eulerY, eulerZ, type) {
             eulerZ: eulerZ,
             health: 0,
             type: type
-        });
+        };
+        player_list.push(player_struct);
         mesh.position.z = x;
         mesh.position.x = y;
         mesh.position.z = z;
@@ -82,6 +86,7 @@ function create_character(id, x, y, z, eulerX, eulerY, eulerZ, type) {
 
         if (player.id === id) {
             player.mesh = mesh;
+            player.struct = player_struct;
             //camera.target = player.mesh;
 
             session_started = true;
@@ -160,6 +165,42 @@ websocket.onmessage = (event) => {
     }
 }
 
+// display DOM user interface
+const uiJoystick = document.getElementById('joystick');
+uiJoystick.style.display = 'block';
+
+function rotatePlayer(eventClientX, eventClientY) {
+    const joystickPositionInfo = uiJoystick.getBoundingClientRect();
+    const x = eventClientX - joystickPositionInfo.width / 2;
+    const y = eventClientY - joystickPositionInfo.height / 2;
+
+    player.movement.isRotating = true;
+    player.movement.eulerX = player.struct.eulerX + y * 0.01;
+    player.movement.eulerZ = player.struct.eulerZ - x * 0.01;
+    player.movement.eulerY = player.struct.eulerY;
+
+    const thumbstick = document.getElementById('thumbstick');
+    thumbstick.style.display = 'block';
+    const thumbstickPositionInfo = thumbstick.getBoundingClientRect();
+    thumbstick.style.left = eventClientX - thumbstickPositionInfo.width / 2 + 'px';
+    thumbstick.style.top = eventClientY - thumbstickPositionInfo.height / 2 + 'px';
+}
+
+uiJoystick.onmousedown = function (event) {
+    rotatePlayer(event.clientX, event.clientY);
+};
+
+uiJoystick.onmousemove = function (event) {
+    if (player.movement.isRotating) {
+        rotatePlayer(event.clientX, event.clientY);
+    }
+};
+
+uiJoystick.onmouseup = function () {
+    document.getElementById('thumbstick').style.display = 'none';
+    player.movement.isRotating = false;
+};
+
 // open the WebSocket connection
 websocket.onopen = () => {
     websocket.send(JSON.stringify({ type: 'join' }));
@@ -193,14 +234,14 @@ document.addEventListener('keydown', function (event) {
 
 // client network update pulse
 setInterval(() => {
-    const arraybuffer = new ArrayBuffer(20);
-    const dataview = new DataView(arraybuffer);
-
-    // player wants to move
-    if (player.movement.isMoving) {
-        player.movement.isMoving = false;
+    // player wants to rotate their flying craft
+    if (player.movement.isRotating) {
+        const arraybuffer = new ArrayBuffer(13);
+        const dataview = new DataView(arraybuffer);
         dataview.setUint8(0, 1);
-        dataview.setUint8(1, 1);
+        dataview.setFloat32(1, player.movement.eulerX);
+        dataview.setFloat32(5, player.movement.eulerY);
+        dataview.setFloat32(9, player.movement.eulerZ);
         websocket.send(dataview);
     }
 
@@ -237,7 +278,7 @@ setInterval(() => {
                 player_object.mesh.position.z = player_object.z;
             });
         }
-        player_list.forEach(player_object=>{
+        player_list.forEach(player_object => {
             player_object.mesh.rotation.z = player_object.eulerZ;
             player_object.mesh.rotation.x = player_object.eulerX;
             player_object.mesh.rotation.y = player_object.eulerY;
