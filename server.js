@@ -215,7 +215,7 @@ ws_server.on('connection', websocket => {
                 const eulerY = clampAngle(client_dataview.getFloat32(5));
                 const eulerZ = clampAngle(client_dataview.getFloat32(9));
 
-                const rotationMatrix = generateRotationMatrixFromEuler(eulerX,eulerY,eulerZ);
+                const rotationMatrix = generateRotationMatrixFromEuler(eulerX, eulerY, eulerZ);
                 const forwardVector = [rotationMatrix[0][2], rotationMatrix[1][2], rotationMatrix[2][2]];
 
                 player.eulerX = forwardVector[0];
@@ -269,14 +269,6 @@ class Game {
         const y = Math.random() * (this.mapSize + 1);
         const z = Math.random() * (this.mapSize + 1);
 
-        const eulerX = Math.random() * Math.PI * 2; // the rotation matrix generation function will mutate the X euler angle into a forward vector component
-        const eulerY = Math.random() * Math.PI * 2;
-        const eulerZ = Math.random() * Math.PI * 2;
-
-        // construct rotation matrix to obtain the forward facing Euler angle direction
-        const rotationMatrix = generateRotationMatrixFromEuler(eulerX, eulerY, eulerZ);
-        const forwardVector = [rotationMatrix[0][2], rotationMatrix[1][2], rotationMatrix[2][2]];
-
         const character = {
             id: id,
             type: isHumanPlayer, // true for player and false for NPC. TODO: create additional logic for NPCs inside this function
@@ -285,9 +277,9 @@ class Game {
             x: x,
             y: y,
             z: z,
-            eulerX: forwardVector[0],
-            eulerY: forwardVector[1],
-            eulerZ: forwardVector[2],
+            eulerX: preventGimbalLock(Math.random() * Math.PI * 2),
+            eulerY: Math.random() * Math.PI * 2,
+            eulerZ: Math.random() * Math.PI * 2,
 
             //movement_speed: config.player.defaultMovementSpeed, // speed will be a ratio of the throttle speed and character maximum movement speed
             movement_speed: 0.1,
