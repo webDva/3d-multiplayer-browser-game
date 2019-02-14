@@ -265,18 +265,15 @@ class Game {
         while (this.players.concat(this.npcs).find(character => character.id === id)) {
             id = randomUint32();
         }
-        const x = Math.random() * (this.mapSize + 1); // make these numbers negative for the spherical map
-        const y = Math.random() * (this.mapSize + 1);
-        const z = Math.random() * (this.mapSize + 1);
 
         const character = {
             id: id,
             type: isHumanPlayer, // true for player and false for NPC. TODO: create additional logic for NPCs inside this function
 
             // initial orientation
-            x: x,
-            y: y,
-            z: z,
+            x: Math.random() * (this.mapSize + 1), // make these numbers negative for the spherical map
+            y: Math.random() * (this.mapSize + 1),
+            z: Math.random() * (this.mapSize + 1),
             eulerX: preventGimbalLock(Math.random() * Math.PI * 2),
             eulerY: Math.random() * Math.PI * 2,
             eulerZ: Math.random() * Math.PI * 2,
