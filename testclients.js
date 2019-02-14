@@ -34,11 +34,9 @@ class Client {
                 const arraybuffer = new ArrayBuffer(13);
                 const dataview = new DataView(arraybuffer);
                 dataview.setUint8(0, 1);
-                const max = Math.PI * 2;
-                const min = 0;
-                dataview.setFloat32(1, Math.floor(Math.random() * (max - min + 1) + min));
-                dataview.setFloat32(5, Math.floor(Math.random() * (max - min + 1) + min));
-                dataview.setFloat32(9, Math.floor(Math.random() * (max - min + 1) + min));
+                dataview.setFloat32(1, Math.random() * Math.PI * 2);
+                dataview.setFloat32(5, Math.random() * Math.PI * 2);
+                dataview.setFloat32(9, Math.random() * Math.PI * 2);
                 this.websocket.send(dataview);
             }
         }, move_rate);
