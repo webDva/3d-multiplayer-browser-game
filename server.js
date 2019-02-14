@@ -211,13 +211,16 @@ ws_server.on('connection', websocket => {
             if (client_dataview.getUint8(0) === 1) {
                 const player = websocket.player;
 
-                const eulerX = client_dataview.getFloat32(1);
-                const eulerY = client_dataview.getFloat32(5);
-                const eulerZ = client_dataview.getFloat32(9);
+                const eulerX = clampAngle(client_dataview.getFloat32(1));
+                const eulerY = clampAngle(client_dataview.getFloat32(5));
+                const eulerZ = clampAngle(client_dataview.getFloat32(9));
 
-                player.eulerX = preventGimbalLock(clampAngle(eulerX));
-                player.eulerY = clampAngle(eulerY);
-                player.eulerZ = clampAngle(eulerZ);
+                const rotationMatrix = generateRotationMatrixFromEuler(eulerX,eulerY,eulerZ);
+                const forwardVector = [rotationMatrix[0][2], rotationMatrix[1][2], rotationMatrix[2][2]];
+
+                player.eulerX = forwardVector[0];
+                player.eulerY = forwardVector[1];
+                player.eulerZ = forwardVector[2];
             }
 
             // player is attacking someone or something
