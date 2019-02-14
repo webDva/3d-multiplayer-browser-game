@@ -15,10 +15,9 @@ const camera = new BABYLON.UniversalCamera('camera', new BABYLON.Vector3(0, 0, 0
 //const camera = new BABYLON.ArcRotateCamera("Camera", 1, 1, 4, new BABYLON.Vector3(-10, 10, 20), scene);
 camera.attachControl(canvas, false);
 
-const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, -100, 0), scene);
+const light = new BABYLON.PointLight("light", new BABYLON.Vector3(0, 0, 0), scene);
 light.diffuse = new BABYLON.Color3(1, 1, 1);
-light.specular = new BABYLON.Color3(0, 0, 0);
-light.groundColor = new BABYLON.Color3(0, 0, 0);
+light.specular = new BABYLON.Color3(1, 1, 1);
 
 // highlight layer for highlighting meshes
 const targetSelectionHighlightLayer = new BABYLON.HighlightLayer("highlightlayer", scene);
@@ -45,23 +44,13 @@ let player_list = [];
 let session_started = false;
 
 function create_character(id, x, y, z, eulerX, eulerY, eulerZ, type) {
-    BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'kawaii.babylon', scene).then(function (imported) {
+    BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'kship.babylon', scene).then(function (imported) {
         const mesh = imported.meshes[0];
 
         if (type === 0) { // if an NPC
             mesh.material = new BABYLON.StandardMaterial('', scene);
             mesh.material.diffuseColor = BABYLON.Color3.Red();
         }
-
-        // animation
-        mesh.skeleton.animationPropertiesOverride = new BABYLON.AnimationPropertiesOverride();
-        mesh.skeleton.animationPropertiesOverride.enableBlending = true;
-        mesh.skeleton.animationPropertiesOverride.blendingSpeed = 0.2;
-        mesh.skeleton.animationPropertiesOverride.loopMode = 1;
-        mesh.idleRange = mesh.skeleton.getAnimationRange('Idle');
-        mesh.runRange = mesh.skeleton.getAnimationRange('Run');
-        mesh.attackRange = mesh.skeleton.getAnimationRange('Attack');
-        mesh.idleRange.animation = scene.beginAnimation(mesh.skeleton, mesh.idleRange.from, mesh.idleRange.to, true, 1);
 
         mesh.KGAME_TYPE = 1; // KGAME_TYPE 1 means that it is a kawaii game mesh of type 1
         const player_struct = {
