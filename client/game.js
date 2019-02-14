@@ -172,21 +172,29 @@ function rotatePlayer(eventClientX, eventClientY) {
     player.movement.eulerZ = player.struct.eulerZ - x * 0.01;
     player.movement.eulerY = player.struct.eulerY;
     player.movement.isRotating = true;
+}
+
+uiJoystick.onmousedown = function (event) {
+    const bounds = event.target.getBoundingClientRect();
+    rotatePlayer(event.clientX - bounds.left, event.clientY - bounds.top);
 
     const thumbstick = document.getElementById('thumbstick');
     thumbstick.style.display = 'block';
     const thumbstickPositionInfo = thumbstick.getBoundingClientRect();
-    thumbstick.style.left = eventClientX - thumbstickPositionInfo.width / 2 + 'px';
-    thumbstick.style.top = eventClientY - thumbstickPositionInfo.height / 2 + 'px';
-}
-
-uiJoystick.onmousedown = function (event) {
-    rotatePlayer(event.clientX, event.clientY);
+    thumbstick.style.left = event.clientX - thumbstickPositionInfo.width / 2 + 'px';
+    thumbstick.style.top = event.clientY - thumbstickPositionInfo.height / 2 + 'px';
 };
 
 uiJoystick.onmousemove = function (event) {
     if (player.movement.isRotating) {
-        rotatePlayer(event.clientX, event.clientY);
+        const bounds = event.target.getBoundingClientRect();
+        rotatePlayer(event.clientX - bounds.left, event.clientY - bounds.top);
+
+        const thumbstick = document.getElementById('thumbstick');
+        thumbstick.style.display = 'block';
+        const thumbstickPositionInfo = thumbstick.getBoundingClientRect();
+        thumbstick.style.left = event.clientX - thumbstickPositionInfo.width / 2 + 'px';
+        thumbstick.style.top = event.clientY - thumbstickPositionInfo.height / 2 + 'px';
     }
 };
 

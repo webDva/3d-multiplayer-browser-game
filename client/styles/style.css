@@ -25,6 +25,8 @@ html, body {
 }
 
 #joystick {
+    left: 20px;
+    bottom: 20px;
     height: 200px;
     width: 200px;
     border: 4px solid black;
@@ -34,7 +36,7 @@ html, body {
 
 #thumbstick {
     display: none;
-    position: absolute;
+    position: fixed;
     pointer-events: none;
     height: 100px;
     width: 100px;
