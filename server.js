@@ -487,10 +487,7 @@ function generateRotationMatrixFromEuler(X, Y, Z) {
 }
 
 function clampAngle(angle) {
-    if (angle >= Math.PI * 2 || angle < 0) {
-        angle = Math.abs(angle % (Math.PI * 2)); // absolute value of the remainder
-    }
-    return angle;
+    return angle % (Math.PI * 2);
 }
 
 function preventGimbalLock(angle) {
@@ -498,6 +495,8 @@ function preventGimbalLock(angle) {
     const degrees = angle * 180 / Math.PI;
     if (degrees > X_ANGLE_THRESHOLD) {
         angle = X_ANGLE_THRESHOLD * Math.PI / 180;
+    } else if (degrees < -X_ANGLE_THRESHOLD) {
+        angle = -X_ANGLE_THRESHOLD * Math.PI / 180;
     }
     return angle;
 }
