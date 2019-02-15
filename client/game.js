@@ -165,12 +165,45 @@ uiJoystick.style.display = 'block';
 
 function rotatePlayer(eventClientX, eventClientY) {
     const joystickPositionInfo = uiJoystick.getBoundingClientRect();
-    const x = eventClientX - joystickPositionInfo.width / 2;
-    const y = eventClientY - joystickPositionInfo.height / 2;
+    const rollAmount = eventClientX - joystickPositionInfo.width / 2;
+    const pitchAmount = eventClientY - joystickPositionInfo.height / 2;
 
-    player.movement.eulerX = player.struct.eulerX + y * 0.01;
-    player.movement.eulerZ = player.struct.eulerZ - x * 0.01;
-    player.movement.eulerY = player.struct.eulerY;
+    const rotationMatrix = generateRotationMatrixFromEuler(player.struct.eulerX, player.struct.eulerY, player.struct.eulerZ);
+    const forwardVector = [rotationMatrix[0][2], rotationMatrix[1][2], rotationMatrix[2][2]];
+
+    const controlSensitivity = 0.01;
+    const newForwardVector = [forwardVector[0] + pitchAmount * controlSensitivity, forwardVector[1], forwardVector[2] + rollAmount * controlSensitivity, 0];
+    //const newForwardVector = [forwardVector[0] + pitchAmount * controlSensitivity, forwardVector[1], forwardVector[2], 0];
+
+    fillColumnVector(rotationMatrix, 2, newForwardVector);
+
+    if (rotationMatrix[2][0] !== Math.abs(1)) {
+        const eulerX = -Math.asin(rotationMatrix[2][0]);
+        const eulerY = Math.atan2(rotationMatrix[2][1] / Math.cos(eulerX), rotationMatrix[2][2] / Math.cos(eulerX));
+        const eulerZ = Math.atan2(rotationMatrix[1][0] / Math.cos(eulerX), rotationMatrix[0][0] / Math.cos(eulerX));
+
+        player.movement.eulerX = eulerX;
+        player.movement.eulerY = eulerY;
+        player.movement.eulerZ = eulerZ;
+    } else {
+        const eulerZ = 0;
+        if (rotationMatrix[2][0] === -1) {
+            const eulerX = Math.PI / 2;
+            const eulerY = Math.atan2(rotationMatrix[0][1], rotationMatrix[0][2]);
+
+            player.movement.eulerX = eulerX;
+            player.movement.eulerY = eulerY;
+            player.movement.eulerZ = eulerZ;
+        } else if (rotationMatrix[2][0] === 1) {
+            const eulerX = -Math.PI / 2;
+            const eulerY = Math.atan2(-rotationMatrix[0][1], -rotationMatrix[0][2]);
+
+            player.movement.eulerX = eulerX;
+            player.movement.eulerY = eulerY;
+            player.movement.eulerZ = eulerZ;
+        }
+    }
+
     player.movement.isRotating = true;
 }
 
@@ -208,11 +241,11 @@ websocket.onopen = () => {
     websocket.send(JSON.stringify({ type: 'join' }));
 };
 
-for (let i = 0; i < 1000; i++) {
+for (let i = 0; i < 1500; i++) {
     const dummy = BABYLON.MeshBuilder.CreateBox("box", { diameter: 20 }, scene);
-    dummy.position.x = Math.floor(Math.random() * (200 + 1));
-    dummy.position.y = Math.floor(Math.random() * (200 + 1));
-    dummy.position.z = Math.floor(Math.random() * (200 + 1));
+    dummy.position.x = Math.floor(Math.random() * (300 + 1));
+    dummy.position.y = Math.floor(Math.random() * (300 + 1));
+    dummy.position.z = Math.floor(Math.random() * (300 + 1));
     dummy.material = new BABYLON.StandardMaterial("standardmaterial", scene);
 }
 
@@ -307,3 +340,72 @@ window.addEventListener("resize", function () {
     uiCrosshair.style.left = window.innerWidth / 2 - uiCrosshair.getBoundingClientRect().width / 2 + 'px';
     uiCrosshair.style.top = window.innerHeight / 2 - uiCrosshair.getBoundingClientRect().height / 2 + 'px';
 });
+
+function generateRotationMatrixFromEuler(X, Y, Z) {
+    const yRotationMatrix = generateXRotationMatrix(Y);
+    const xRotationMatrix = generateYRotationMatrix(X);
+    const zRotationMatrix = generateZRotationMatrix(Z);
+
+    const zyRotationMatrix = multiplyMatrices(zRotationMatrix, 4, 4, yRotationMatrix, 4, 4);
+    const finalRotationMatrix = multiplyMatrices(zyRotationMatrix, 4, 4, xRotationMatrix, 4, 4);
+    return finalRotationMatrix;
+}
+
+function generateXRotationMatrix(angle) {
+    let matrix = createMatrix(4, 4);
+    fillColumnVector(matrix, 0, [1, 0, 0, 0]);
+    fillColumnVector(matrix, 1, [0, Math.cos(angle), Math.sin(angle), 0]);
+    fillColumnVector(matrix, 2, [0, -Math.sin(angle), Math.cos(angle), 0]);
+    fillColumnVector(matrix, 3, [0, 0, 0, 1]);
+    return matrix;
+}
+
+function generateYRotationMatrix(angle) {
+    let matrix = createMatrix(4, 4);
+    fillColumnVector(matrix, 0, [Math.cos(angle), 0, -Math.sin(angle), 0]);
+    fillColumnVector(matrix, 1, [0, 1, 0, 0]);
+    fillColumnVector(matrix, 2, [Math.sin(angle), 0, Math.cos(angle), 0]);
+    fillColumnVector(matrix, 3, [0, 0, 0, 1]);
+    return matrix;
+}
+
+function generateZRotationMatrix(angle) {
+    let matrix = createMatrix(4, 4);
+    fillColumnVector(matrix, 0, [Math.cos(angle), Math.sin(angle), 0, 0]);
+    fillColumnVector(matrix, 1, [-Math.sin(angle), Math.cos(angle), 0, 0]);
+    fillColumnVector(matrix, 2, [0, 0, 1, 0]);
+    fillColumnVector(matrix, 3, [0, 0, 0, 1]);
+    return matrix;
+}
+
+function fillColumnVector(columnMajorMatrix, column, columnVectorArray) {
+    for (let i = 0; i < 4; i++) {
+        columnMajorMatrix[i][column] = columnVectorArray[i];
+    }
+}
+
+function createMatrix(rows, columns) {
+    let matrix = [];
+    for (let i = 0; i < rows; i++) {
+        matrix[i] = [];
+        for (let j = 0; j < columns; j++) {
+            matrix[i][j] = 0;
+        }
+    }
+    return matrix;
+}
+
+function multiplyMatrices(A, rowsA, columnsA, B, rowsB, columnsB) {
+    if (columnsA !== rowsB) {
+        return null;
+    }
+    let newMatrix = createMatrix(rowsA, columnsB);
+    for (let i = 0; i < rowsA; i++) {
+        for (let j = 0; j < columnsB; j++) {
+            for (let k = 0; k < columnsA; k++) {
+                newMatrix[i][j] += A[i][k] * B[k][j];
+            }
+        }
+    }
+    return newMatrix;
+}
