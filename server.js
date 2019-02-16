@@ -211,16 +211,13 @@ ws_server.on('connection', websocket => {
             if (client_dataview.getUint8(0) === 1) {
                 const player = websocket.player;
 
-                const eulerX = clampAngle(client_dataview.getFloat32(1));
-                const eulerY = clampAngle(client_dataview.getFloat32(5));
-                const eulerZ = clampAngle(client_dataview.getFloat32(9));
+                const xInc = preventGimbalLock(client_dataview.getFloat32(1));
+                const yInc = client_dataview.getFloat32(5);
+                const zInc = client_dataview.getFloat32(9);
 
-                const rotationMatrix = generateRotationMatrixFromEuler(eulerX, eulerY, eulerZ);
-                const forwardVector = [rotationMatrix[0][2], rotationMatrix[1][2], rotationMatrix[2][2]];
-
-                player.eulerX = forwardVector[0];
-                player.eulerY = forwardVector[1];
-                player.eulerZ = forwardVector[2];
+                player.eulerX += xInc;
+                player.eulerY += yInc;
+                player.eulerZ += zInc;
             }
 
             // player is attacking someone or something
@@ -267,7 +264,6 @@ class Game {
         }
 
         const rotationMatrix = generateRotationMatrixFromEuler(preventGimbalLock(Math.random() * Math.PI * 2), Math.random() * Math.PI * 2, Math.random() * Math.PI * 2);
-        const forwardVector = [rotationMatrix[0][2], rotationMatrix[1][2], rotationMatrix[2][2]];
 
         const character = {
             id: id,
@@ -277,9 +273,9 @@ class Game {
             x: Math.random() * (this.mapSize + 1), // make these numbers negative for the spherical map
             y: Math.random() * (this.mapSize + 1),
             z: Math.random() * (this.mapSize + 1),
-            eulerX: forwardVector[0],
-            eulerY: forwardVector[1],
-            eulerZ: forwardVector[2],
+            eulerX: rotationMatrix[0][2],
+            eulerY: rotationMatrix[1][2],
+            eulerZ: rotationMatrix[2][2],
 
             //movement_speed: config.player.defaultMovementSpeed, // speed will be a ratio of the throttle speed and character maximum movement speed
             movement_speed: 0.1,
@@ -342,11 +338,10 @@ class Game {
         })
             .forEach(character => {
                 const rotationMatrix = generateRotationMatrixFromEuler(character.eulerX, character.eulerY, character.eulerZ);
-                const forwardVector = [rotationMatrix[0][2], rotationMatrix[1][2], rotationMatrix[2][2]];
 
-                character.x += forwardVector[0] * character.movement_speed;
-                character.y += forwardVector[1] * character.movement_speed;
-                character.z += forwardVector[2] * character.movement_speed;
+                character.x += rotationMatrix[0][2] * character.movement_speed;
+                character.y += rotationMatrix[1][2] * character.movement_speed;
+                character.z += rotationMatrix[2][2] * character.movement_speed;
             });
     }
 
@@ -440,7 +435,6 @@ function multiplyMatrices(A, rowsA, columnsA, B, rowsB, columnsB) {
 }
 
 function generateXRotationMatrix(angle) {
-    angle = preventGimbalLock(angle);
     let matrix = createMatrix(4, 4);
     fillColumnVector(matrix, 0, [1, 0, 0, 0]);
     fillColumnVector(matrix, 1, [0, Math.cos(angle), Math.sin(angle), 0]);
@@ -481,8 +475,8 @@ function generateRotationMatrixFromEuler(X, Y, Z) {
     const yRotationMatrix = generateYRotationMatrix(Y);
     const zRotationMatrix = generateZRotationMatrix(Z);
 
-    const xyRotationMatrix = multiplyMatrices(xRotationMatrix, 4, 4, yRotationMatrix, 4, 4);
-    const finalRotationMatrix = multiplyMatrices(xyRotationMatrix, 4, 4, zRotationMatrix, 4, 4);
+    const yxRotationMatrix = multiplyMatrices(yRotationMatrix, 4, 4, xRotationMatrix, 4, 4);
+    const finalRotationMatrix = multiplyMatrices(yxRotationMatrix, 4, 4, zRotationMatrix, 4, 4);
     return finalRotationMatrix;
 }
 
@@ -491,7 +485,7 @@ function clampAngle(angle) {
 }
 
 function preventGimbalLock(angle) {
-    const X_ANGLE_THRESHOLD = 89;
+    const X_ANGLE_THRESHOLD = 87;
     const degrees = angle * 180 / Math.PI;
     if (degrees > X_ANGLE_THRESHOLD) {
         angle = X_ANGLE_THRESHOLD * Math.PI / 180;
