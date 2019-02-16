@@ -211,11 +211,11 @@ ws_server.on('connection', websocket => {
             if (client_dataview.getUint8(0) === 1) {
                 const player = websocket.player;
 
-                const xInc = preventGimbalLock(client_dataview.getFloat32(1));
+                const xInc = client_dataview.getFloat32(1);
                 const yInc = client_dataview.getFloat32(5);
                 const zInc = client_dataview.getFloat32(9);
 
-                player.eulerX += xInc;
+                player.eulerX = preventGimbalLock(player.eulerX + xInc);
                 player.eulerY += yInc;
                 player.eulerZ += zInc;
             }
@@ -263,7 +263,7 @@ class Game {
             id = randomUint32();
         }
 
-        const rotationMatrix = generateRotationMatrixFromEuler(preventGimbalLock(Math.random() * Math.PI * 2), Math.random() * Math.PI * 2, Math.random() * Math.PI * 2);
+        const rotationMatrix = generateRotationMatrixFromEuler(0, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2);
 
         const character = {
             id: id,
