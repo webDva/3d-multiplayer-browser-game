@@ -215,7 +215,7 @@ ws_server.on('connection', websocket => {
                 const yInc = client_dataview.getFloat32(5);
                 const zInc = client_dataview.getFloat32(9);
 
-                player.eulerX = preventGimbalLock(player.eulerX + xInc);
+                player.eulerX += xInc;
                 player.eulerY += yInc;
                 player.eulerZ += zInc;
             }
@@ -263,8 +263,6 @@ class Game {
             id = randomUint32();
         }
 
-        const rotationMatrix = generateRotationMatrixFromEuler(0, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2);
-
         const character = {
             id: id,
             type: isHumanPlayer, // true for player and false for NPC. TODO: create additional logic for NPCs inside this function
@@ -273,9 +271,9 @@ class Game {
             x: Math.random() * (this.mapSize + 1), // make these numbers negative for the spherical map
             y: Math.random() * (this.mapSize + 1),
             z: Math.random() * (this.mapSize + 1),
-            eulerX: rotationMatrix[0][2],
-            eulerY: rotationMatrix[1][2],
-            eulerZ: rotationMatrix[2][2],
+            eulerX: 0,
+            eulerY: 0,
+            eulerZ: 0,
 
             //movement_speed: config.player.defaultMovementSpeed, // speed will be a ratio of the throttle speed and character maximum movement speed
             movement_speed: 0.1,
