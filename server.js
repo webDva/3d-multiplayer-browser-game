@@ -215,7 +215,7 @@ ws_server.on('connection', websocket => {
                 const yInc = client_dataview.getFloat32(5);
                 const zInc = client_dataview.getFloat32(9);
 
-                player.eulerX += xInc;
+                player.eulerX = preventGimbalLock(player.eulerX + xInc);
                 player.eulerY += yInc;
                 player.eulerZ += zInc;
             }

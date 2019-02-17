@@ -168,8 +168,8 @@ function rotatePlayer(eventClientX, eventClientY) {
     const rollAmount = eventClientX - joystickPositionInfo.width / 2;
     const pitchAmount = eventClientY - joystickPositionInfo.height / 2;
 
-    const controlSensitivity = 0.01;
-    player.movement.eulerX = 0.1;
+    const controlSensitivity = 0.001;
+    player.movement.eulerX = -pitchAmount * controlSensitivity;
     player.movement.eulerY = 0;
     player.movement.eulerZ = 0;
 
