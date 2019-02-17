@@ -171,7 +171,7 @@ function rotatePlayer(eventClientX, eventClientY) {
     player.movement.isRotating = true;
 }
 
-uiJoystick.onmousedown = function (event) {
+uiJoystick.onpointerdown = function (event) {
     const bounds = event.target.getBoundingClientRect();
     rotatePlayer(event.clientX - bounds.left, event.clientY - bounds.top);
 
@@ -182,7 +182,7 @@ uiJoystick.onmousedown = function (event) {
     thumbstick.style.top = event.clientY - thumbstickPositionInfo.height / 2 + 'px';
 };
 
-uiJoystick.onmousemove = function (event) {
+uiJoystick.onpointermove = function (event) {
     if (player.movement.isRotating) {
         const bounds = event.target.getBoundingClientRect();
         rotatePlayer(event.clientX - bounds.left, event.clientY - bounds.top);
@@ -195,7 +195,7 @@ uiJoystick.onmousemove = function (event) {
     }
 };
 
-uiJoystick.onmouseup = function () {
+uiJoystick.onpointerup = function () {
     document.getElementById('thumbstick').style.display = 'none';
     player.movement.isRotating = false;
 };
