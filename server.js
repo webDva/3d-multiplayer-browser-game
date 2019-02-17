@@ -271,6 +271,7 @@ class Game {
             x: Math.random() * (this.mapSize + 1), // make these numbers negative for the spherical map
             y: Math.random() * (this.mapSize + 1),
             z: Math.random() * (this.mapSize + 1),
+            // rotations have to be zero initially
             eulerX: 0,
             eulerY: 0,
             eulerZ: 0,

@@ -171,7 +171,7 @@ function rotatePlayer(eventClientX, eventClientY) {
     const controlSensitivity = 0.001;
     player.movement.eulerX = -pitchAmount * controlSensitivity;
     player.movement.eulerY = 0;
-    player.movement.eulerZ = 0;
+    player.movement.eulerZ = -rollAmount * controlSensitivity;
 
     player.movement.isRotating = true;
 }
