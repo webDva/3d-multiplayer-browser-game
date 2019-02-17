@@ -31,8 +31,7 @@ const player = {
         isRotating: false,
         // requested orientation
         eulerX: 0,
-        eulerY: 0,
-        eulerZ: 0
+        eulerY: 0
     },
 
     combat: {
@@ -43,7 +42,7 @@ const player = {
 let player_list = [];
 let session_started = false;
 
-function create_character(id, x, y, z, eulerX, eulerY, eulerZ, type) {
+function create_character(id, x, y, z, eulerX, eulerY, type) {
     BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'kship.babylon', scene).then(function (imported) {
         const mesh = imported.meshes[0];
 
@@ -61,7 +60,6 @@ function create_character(id, x, y, z, eulerX, eulerY, eulerZ, type) {
             mesh: mesh,
             eulerX: eulerX,
             eulerY: eulerY,
-            eulerZ: eulerZ,
             health: 0,
             type: type
         };
@@ -69,7 +67,6 @@ function create_character(id, x, y, z, eulerX, eulerY, eulerZ, type) {
         mesh.position.z = x;
         mesh.position.x = y;
         mesh.position.z = z;
-        mesh.rotation.z = eulerZ;
         mesh.rotation.x = eulerX;
         mesh.rotation.y = eulerY;
 
@@ -107,14 +104,13 @@ websocket.onmessage = (event) => {
         // player orientations
         if (dataview.getUint8(0) === 1) {
             for (let i = 0; i < dataview.getUint8(1); i++) {
-                const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(2 + i * 28));
+                const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(2 + i * 24));
                 if (player_object) {
-                    player_object.x = dataview.getFloat32(6 + i * 28);
-                    player_object.y = dataview.getFloat32(10 + i * 28);
-                    player_object.z = dataview.getFloat32(14 + i * 28);
-                    player_object.eulerX = dataview.getFloat32(18 + i * 28);
-                    player_object.eulerY = dataview.getFloat32(22 + i * 28);
-                    player_object.eulerZ = dataview.getFloat32(26 + i * 28);
+                    player_object.x = dataview.getFloat32(6 + i * 24);
+                    player_object.y = dataview.getFloat32(10 + i * 24);
+                    player_object.z = dataview.getFloat32(14 + i * 24);
+                    player_object.eulerX = dataview.getFloat32(18 + i * 24);
+                    player_object.eulerY = dataview.getFloat32(22 + i * 24);
                 }
             }
         }
@@ -127,7 +123,7 @@ websocket.onmessage = (event) => {
 
         // new player joins
         if (dataview.getUint8(0) === 4) {
-            create_character(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getFloat32(13), dataview.getFloat32(17), dataview.getFloat32(21), dataview.getFloat32(25), dataview.getInt8(29));
+            create_character(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getFloat32(13), dataview.getFloat32(17), dataview.getFloat32(21), dataview.getInt8(25));
         }
 
         // player disconnect
@@ -171,7 +167,6 @@ function rotatePlayer(eventClientX, eventClientY) {
     const controlSensitivity = 0.001;
     player.movement.eulerX = -pitchAmount * controlSensitivity;
     player.movement.eulerY = yawAmount * controlSensitivity;
-    player.movement.eulerZ = 0;
 
     player.movement.isRotating = true;
 }
@@ -240,12 +235,11 @@ document.addEventListener('keydown', function (event) {
 setInterval(() => {
     // player wants to rotate their flying craft
     if (player.movement.isRotating) {
-        const arraybuffer = new ArrayBuffer(13);
+        const arraybuffer = new ArrayBuffer(9);
         const dataview = new DataView(arraybuffer);
         dataview.setUint8(0, 1);
         dataview.setFloat32(1, player.movement.eulerX);
         dataview.setFloat32(5, player.movement.eulerY);
-        dataview.setFloat32(9, player.movement.eulerZ);
         websocket.send(dataview);
     }
 
@@ -277,7 +271,6 @@ setInterval(() => {
 
                 player_object.mesh.rotation.x = lerp(player_object.mesh.rotation.x, player_object.eulerX, deltaTime / lerpTime);
                 player_object.mesh.rotation.y = lerp(player_object.mesh.rotation.y, player_object.eulerY, deltaTime / lerpTime);
-                player_object.mesh.rotation.z = lerp(player_object.mesh.rotation.z, player_object.eulerZ, deltaTime / lerpTime);
             });
         } else { // don't lerp
             player_list.forEach(player_object => {
@@ -287,7 +280,6 @@ setInterval(() => {
 
                 player_object.mesh.rotation.x = player_object.eulerX;
                 player_object.mesh.rotation.y = player_object.eulerY;
-                player_object.mesh.rotation.z = player_object.eulerZ;
             });
         }
     }

@@ -181,7 +181,6 @@ ws_server.on('connection', websocket => {
                     { type: 'Float32', value: websocket.player.z },
                     { type: 'Float32', value: websocket.player.eulerX },
                     { type: 'Float32', value: websocket.player.eulerY },
-                    { type: 'Float32', value: websocket.player.eulerZ },
                     { type: 'Int8', value: 1 } // player type and not an NPC type
                 ]), websocket);
             }
@@ -197,7 +196,6 @@ ws_server.on('connection', websocket => {
                         { type: 'Float32', value: character.z },
                         { type: 'Float32', value: character.eulerX },
                         { type: 'Float32', value: character.eulerY },
-                        { type: 'Float32', value: character.eulerZ },
                         { type: 'Int8', value: character.type ? 1 : 0 } // 1 if is a player and 0 if an NPC
                     ]), websocket);
                 });
@@ -213,11 +211,9 @@ ws_server.on('connection', websocket => {
 
                 const xInc = client_dataview.getFloat32(1);
                 const yInc = client_dataview.getFloat32(5);
-                const zInc = client_dataview.getFloat32(9);
 
                 player.eulerX = preventGimbalLock(player.eulerX + xInc);
                 player.eulerY += yInc;
-                player.eulerZ += zInc;
             }
 
             // player is attacking someone or something
@@ -274,7 +270,6 @@ class Game {
             // rotations have to be zero initially
             eulerX: 0,
             eulerY: 0,
-            eulerZ: 0,
 
             //movement_speed: config.player.defaultMovementSpeed, // speed will be a ratio of the throttle speed and character maximum movement speed
             movement_speed: 0.1,
@@ -336,7 +331,7 @@ class Game {
             return true;
         })
             .forEach(character => {
-                const rotationMatrix = generateRotationMatrixFromEuler(character.eulerX, character.eulerY, character.eulerZ);
+                const rotationMatrix = generateRotationMatrixFromEuler(character.eulerX, character.eulerY, 0);
 
                 character.x += rotationMatrix[0][2] * character.movement_speed;
                 character.y += rotationMatrix[1][2] * character.movement_speed;
@@ -363,7 +358,6 @@ class Game {
             orientations.push({ type: 'Float32', value: character.z });
             orientations.push({ type: 'Float32', value: character.eulerX });
             orientations.push({ type: 'Float32', value: character.eulerY });
-            orientations.push({ type: 'Float32', value: character.eulerZ });
         });
         broadcast(createBinaryFrame(1, orientations));
 
