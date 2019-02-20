@@ -359,6 +359,16 @@ class Game {
             projectile.position.x += projectile.forwardVector.x * projectile.speed;
             projectile.position.y += projectile.forwardVector.y * projectile.speed;
             projectile.position.z += projectile.forwardVector.z * projectile.speed;
+
+            // move the projectile's physics box as well
+            projectile.physicsBox.minX = projectile.position.x - 3 / 2;
+            projectile.physicsBox.maxX = projectile.position.x + 3 / 2;
+
+            projectile.physicsBox.minY = projectile.position.y - 3 / 2;
+            projectile.physicsBox.maxY = projectile.position.y + 3 / 2;
+
+            projectile.physicsBox.minZ = projectile.position.z - 3 / 2;
+            projectile.physicsBox.maxZ = projectile.position.z + 3 / 2;
         });
 
         // player and NPC movement
