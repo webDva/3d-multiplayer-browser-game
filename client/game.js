@@ -35,12 +35,12 @@ const player = {
     },
 
     combat: {
-        target: null,
-        attack: null
+        attack: false
     }
 };
 let player_list = [];
 let session_started = false;
+const projectile_list = [];
 
 function create_character(id, x, y, z, eulerX, eulerY, type) {
     BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'kship.babylon', scene).then(function (imported) {
@@ -126,6 +126,28 @@ websocket.onmessage = (event) => {
             create_character(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getFloat32(13), dataview.getFloat32(17), dataview.getFloat32(21), dataview.getInt8(25));
         }
 
+        // new projectiles
+        if (dataview.getUint8(0) === 5) {
+            const projectile = {
+                mesh: BABYLON.MeshBuilder.CreateSphere("sphere", {}, scene),
+                position: {
+                    x: dataview.getFloat32(1),
+                    y: dataview.getFloat32(5),
+                    z: dataview.getFloat32(9)
+                },
+                forwardVector: {
+                    x: dataview.getFloat32(13),
+                    y: dataview.getFloat32(17),
+                    z: dataview.getFloat32(21)
+                },
+                creationTime: Date.now(),
+                speed: dataview.getFloat32(25),
+                owner: dataview.getUint32(29)
+            };
+            projectile.mesh.position = new BABYLON.Vector3(projectile.position.x, projectile.position.y, projectile.position.z);
+            projectile_list.push(projectile);
+        }
+
         // player disconnect
         if (dataview.getUint8(0) === 6) {
             // player objects can be duplicated too,so this would actually need an array from Array.filter
@@ -158,6 +180,9 @@ uiCrosshair.style.top = window.innerHeight / 2 - uiCrosshair.getBoundingClientRe
 
 const uiJoystick = document.getElementById('joystick');
 uiJoystick.style.display = 'block';
+
+const fireButton = document.getElementById('fire-button');
+fireButton.style.display = 'block';
 
 function rotatePlayer(eventClientX, eventClientY) {
     const joystickPositionInfo = uiJoystick.getBoundingClientRect();
@@ -199,6 +224,15 @@ uiJoystick.onpointerup = function () {
     document.getElementById('thumbstick').style.display = 'none';
     player.movement.isRotating = false;
 };
+
+// fire button
+fireButton.onpointerdown = function (event) {
+    player.combat.attack = true;
+}
+
+fireButton.onpointerup = function (event) {
+    player.combat.attack = false;
+}
 
 // open the WebSocket connection
 websocket.onopen = () => {
@@ -243,11 +277,12 @@ setInterval(() => {
         websocket.send(dataview);
     }
 
+    // player wants to attack
     if (player.combat.attack) {
-        dataview.setUint8(0, 3);
-        dataview.setUint32(1, player.combat.target);
+        const arraybuffer = new ArrayBuffer(1);
+        const dataview = new DataView(arraybuffer);
+        dataview.setUint8(0, 2);
         websocket.send(dataview);
-        player.combat.attack = null;
     }
 }, 1000 / 20);
 
@@ -282,6 +317,13 @@ setInterval(() => {
                 player_object.mesh.rotation.y = player_object.eulerY;
             });
         }
+
+        // projectile movement
+        projectile_list.forEach(projectile => {
+            projectile.mesh.position.x += projectile.forwardVector.x * projectile.speed;
+            projectile.mesh.position.y += projectile.forwardVector.y * projectile.speed;
+            projectile.mesh.position.z += projectile.forwardVector.z * projectile.speed;
+        });
     }
 
     lastUpdateTime = Date.now();
@@ -290,8 +332,17 @@ setInterval(() => {
 // mostly for game logic and animation stuff
 scene.registerBeforeRender(function () {
     if (session_started) {
+        // camera position and rotation
         camera.position = player.mesh.position;
         camera.rotation = player.mesh.rotation;
+
+        // remove expired projectiles on the client side
+        projectile_list.forEach(projectile => {
+            if (Date.now() - projectile.creationTime > 10000) {
+                projectile.mesh.dispose();
+                projectile_list.splice(projectile_list.indexOf(projectile), 1);
+            }
+        });
     }
 });
 

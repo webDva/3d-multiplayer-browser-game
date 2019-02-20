@@ -216,12 +216,40 @@ ws_server.on('connection', websocket => {
                 player.eulerY += yInc;
             }
 
-            // player is attacking someone or something
-            if (client_dataview.getUint8(0) === 3) {
+            // player is shooting a projectile
+            if (client_dataview.getUint8(0) === 2) {
                 const player = websocket.player;
-                const target = client_dataview.getUint32(1); // player ID or mob ID
-                if (true) { // will do move legality processing here
-                    game.combat.attacks.push({ attacker: player.id, target: target });
+                if (player.isAlive) {
+                    const rotationMatrix = generateRotationMatrixFromEuler(player.eulerX, player.eulerY, 0);
+                    const playerForwardVector = [rotationMatrix[0][2], rotationMatrix[1][2], rotationMatrix[2][2]];
+                    const projectile = {
+                        position: {
+                            x: player.x,
+                            y: player.y,
+                            z: player.z,
+                        },
+                        forwardVector: {
+                            x: playerForwardVector[0],
+                            y: playerForwardVector[1],
+                            z: playerForwardVector[2]
+                        },
+                        physicsBox: {
+                            minX: player.x - 3 / 2,
+                            maxX: player.x + 3 / 2,
+
+                            minY: player.y - 3 / 2,
+                            maxY: player.y + 3 / 2,
+
+                            minZ: player.z - 3 / 2,
+                            maxZ: player.z + 3 / 2
+                        },
+                        speed: 3,
+                        creationTime: Date.now(),
+                        owner: player.id
+                    };
+
+                    game.projectiles.push(projectile);
+                    game.networkUpdates.combat.newProjectiles.push(projectile);
                 }
             }
         }
@@ -241,7 +269,7 @@ class Game {
         this.mapSize = config.mapSize; // width and height
         this.networkUpdates = {
             combat: {
-                attacks: [],
+                newProjectiles: [],
                 deaths: [],
                 respawns: [] // or joins
             }
@@ -251,6 +279,7 @@ class Game {
         };
         this.npcs = [];
         //const npc = this.addNPC();
+        this.projectiles = [];
     }
 
     addCharacter(isHumanPlayer = true) {
@@ -325,6 +354,13 @@ class Game {
     }
 
     physicsLoop() {
+        // projectile movement
+        this.projectiles.forEach(projectile => {
+            projectile.position.x += projectile.forwardVector.x * projectile.speed;
+            projectile.position.y += projectile.forwardVector.y * projectile.speed;
+            projectile.position.z += projectile.forwardVector.z * projectile.speed;
+        });
+
         // player and NPC movement
         this.players.concat(this.npcs).filter(character => { // collision detection
             // for now, there is no collision detection
@@ -340,11 +376,14 @@ class Game {
     }
 
     gameLogicLoop() {
-        // combat attacks
-        this.combat.attacks.forEach(attack => {
-            this.networkUpdates.combat.attacks.push(attack);
-            this.combat.attacks.splice(this.combat.attacks.indexOf(attack), 1);
+        // remove expired projectiles
+        this.projectiles.forEach(projectile => {
+            if (Date.now() - projectile.creationTime > 10000) {
+                this.projectiles.splice(this.projectiles.indexOf(projectile), 1);
+            }
         });
+
+        // projectile-player collisions
     }
 
     sendNetworkUpdates() {
@@ -370,14 +409,19 @@ class Game {
         });
         broadcast(createBinaryFrame(9, healths));
 
-        // send attacks that characters performed
-        // since NPCs are here now, will need to send attack types
-        this.networkUpdates.combat.attacks.forEach(attack => {
-            broadcast(createBinaryFrame(2, [
-                { type: 'Uint32', value: attack.attacker },
-                { type: 'Uint32', value: attack.target }
+        // new projectiles
+        this.networkUpdates.combat.newProjectiles.forEach(projectile => {
+            broadcast(createBinaryFrame(5, [
+                { type: 'Float32', value: projectile.position.x },
+                { type: 'Float32', value: projectile.position.y },
+                { type: 'Float32', value: projectile.position.z },
+                { type: 'Float32', value: projectile.forwardVector.x },
+                { type: 'Float32', value: projectile.forwardVector.y },
+                { type: 'Float32', value: projectile.forwardVector.z },
+                { type: 'Float32', value: projectile.speed },
+                { type: 'Uint32', value: projectile.owner }
             ]));
-            this.networkUpdates.combat.attacks.splice(this.networkUpdates.combat.attacks.indexOf(attack), 1);
+            this.networkUpdates.combat.newProjectiles.splice(this.networkUpdates.combat.newProjectiles.indexOf(projectile), 1);
         });
     }
 }
