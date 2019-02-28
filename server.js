@@ -293,9 +293,9 @@ class Game {
             type: isHumanPlayer, // true for player and false for NPC. TODO: create additional logic for NPCs inside this function
 
             // initial orientation
-            x: Math.random() * (this.mapSize + 1), // make these numbers negative for the spherical map
-            y: Math.random() * (this.mapSize + 1),
-            z: Math.random() * (this.mapSize + 1),
+            x: Math.random() * (this.mapSize - -this.mapSize) + -this.mapSize,
+            y: Math.random() * (this.mapSize - -this.mapSize) + -this.mapSize,
+            z: Math.random() * (this.mapSize - -this.mapSize) + -this.mapSize,
             // rotations have to be zero initially
             eulerX: 0,
             eulerY: 0,
