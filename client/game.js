@@ -241,9 +241,9 @@ websocket.onopen = () => {
 
 for (let i = 0; i < 1500; i++) {
     const dummy = BABYLON.MeshBuilder.CreateBox("box", { diameter: 20 }, scene);
-    dummy.position.x = Math.floor(Math.random() * (300 + 1));
-    dummy.position.y = Math.floor(Math.random() * (300 + 1));
-    dummy.position.z = Math.floor(Math.random() * (300 + 1));
+    dummy.position.x = Math.floor(Math.random() * (200 - -200) + -200);
+    dummy.position.y = Math.floor(Math.random() * (200 - -200) + -200);
+    dummy.position.z = Math.floor(Math.random() * (200 - -200) + -200);
     dummy.material = new BABYLON.StandardMaterial("standardmaterial", scene);
 }
 
