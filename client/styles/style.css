@@ -67,3 +67,14 @@ html, body {
     border-radius: 25%;
     background-color: rgba(255, 7, 106, 0.3);
 }
+
+#boost-button {
+    right: 30px;
+    bottom: 100px;
+    height: 100px;
+    max-height: 50px;
+    max-width: 50px;
+    width: 100px;
+    border-radius: 25%;
+    background-color: rgba(7, 255, 160, 0.3);    
+}

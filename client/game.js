@@ -31,7 +31,10 @@ const player = {
         isRotating: false,
         // requested orientation
         eulerX: 0,
-        eulerY: 0
+        eulerY: 0,
+
+        // boost
+        boost: false
     },
 
     combat: {
@@ -184,6 +187,9 @@ uiJoystick.style.display = 'block';
 const fireButton = document.getElementById('fire-button');
 fireButton.style.display = 'block';
 
+const boostButton = document.getElementById('boost-button');
+boostButton.style.display = 'block';
+
 function rotatePlayer(eventClientX, eventClientY) {
     const joystickPositionInfo = uiJoystick.getBoundingClientRect();
     const yawAmount = eventClientX - joystickPositionInfo.width / 2;
@@ -228,11 +234,19 @@ uiJoystick.onpointerup = function () {
 // fire button
 fireButton.onpointerdown = function (event) {
     player.combat.attack = true;
-}
+};
 
 fireButton.onpointerup = function (event) {
     player.combat.attack = false;
-}
+};
+
+boostButton.onpointerdown = function (event) {
+    player.movement.boost = true;
+};
+
+boostButton.onpointerup = function (event) {
+    player.movement.boost = false;
+};
 
 // open the WebSocket connection
 websocket.onopen = () => {
@@ -282,6 +296,14 @@ setInterval(() => {
         const arraybuffer = new ArrayBuffer(1);
         const dataview = new DataView(arraybuffer);
         dataview.setUint8(0, 2);
+        websocket.send(dataview);
+    }
+
+    // boost
+    if (player.movement.boost) {
+        const arraybuffer = new ArrayBuffer(1);
+        const dataview = new DataView(arraybuffer);
+        dataview.setUint8(0, 3);
         websocket.send(dataview);
     }
 }, 1000 / 20);

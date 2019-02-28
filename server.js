@@ -188,7 +188,7 @@ ws_server.on('connection', websocket => {
             // a player has requested map data such as players
             if (data.type === 'request_map_data') {
                 // send list of players and NPCs
-                game.players.concat(game.npcs).forEach(character => {
+                game.characters.forEach(character => {
                     transmit(createBinaryFrame(4, [
                         { type: 'Uint32', value: character.id },
                         { type: 'Float32', value: character.x },
@@ -252,11 +252,18 @@ ws_server.on('connection', websocket => {
                     game.networkUpdates.combat.newProjectiles.push(projectile);
                 }
             }
+
+            // stop button pressed
+            if (client_dataview.getUint8(0) === 3) {
+                const player = websocket.player;
+
+                player.movement_speed = 0;
+            }
         }
     });
 
     websocket.on('close', () => {
-        game.players.splice(game.players.indexOf(websocket.player), 1);
+        game.characters.splice(game.characters.indexOf(websocket.player), 1);
         broadcast(createBinaryFrame(6, [{ type: 'Uint32', value: websocket.player.id }]), websocket);
     });
 
@@ -265,7 +272,7 @@ ws_server.on('connection', websocket => {
 
 class Game {
     constructor() {
-        this.players = [];
+        this.characters = [];
         this.mapSize = config.mapSize; // width and height
         this.networkUpdates = {
             combat: {
@@ -284,7 +291,7 @@ class Game {
 
     addCharacter(isHumanPlayer = true) {
         let id = randomUint32();
-        while (this.players.concat(this.npcs).find(character => character.id === id)) {
+        while (this.characters.find(character => character.id === id)) {
             id = randomUint32();
         }
 
@@ -327,41 +334,12 @@ class Game {
             maxZ: character.z + 3 / 2
         };
 
-        this.players.push(character); // list name will change
+        // combat: {
+        //     aggro: [] // a list of player-aggro pairs
+        // }        
+
+        this.characters.push(character);
         return character;
-    }
-
-    addNPC() {
-        let id = randomUint32();
-        while (this.npcs.concat(this.players).find(character => character.id === id)) {
-            id = randomUint32();
-        }
-        const npc = {
-            id: id,
-            type: false, // not a player
-
-            // physics movement and initial starting position
-            x: Math.floor(Math.random() * (this.mapSize + 1)),
-            y: Math.floor(Math.random() * (this.mapSize + 1)),
-            movement_speed: config.player.defaultMovementSpeed, // shares player's movement for now
-
-            // should be shared with players--or not
-            radius: config.player.radius,
-            direction: Math.PI / 2,
-            velocityX: 0,
-            velocityY: 0,
-            targetX: 0,
-            targetY: 0,
-            isMoving: false,
-            health: 100,
-
-            combat: {
-                aggro: [] // a list of player-aggro pairs
-            }
-        };
-
-        this.npcs.push(npc);
-        return npc;
     }
 
     physicsLoop() {
@@ -383,7 +361,7 @@ class Game {
         });
 
         // player and NPC movement
-        this.players.concat(this.npcs).filter(character => { // collision detection
+        this.characters.filter(character => { // collision detection
             // for now, there is no collision detection
             return true;
         })
@@ -414,13 +392,25 @@ class Game {
         });
 
         // projectile-player collisions
+        this.projectiles.forEach(projectile => {
+            this.characters.filter(character => {
+                if (projectile.owner !== character.id && character.isAlive === true) return true;
+            })
+                .forEach(character => {
+                    if (isIntersecting(projectile.physicsBox, character.physicsBox)) {
+                        character.health--;
+                        this.projectiles.splice(this.projectiles.indexOf(projectile), 1);
+                        console.log('hit')
+                    }
+                });
+        });
     }
 
     sendNetworkUpdates() {
         // send player and NPC orientations
         let orientations = [];
-        orientations.push({ type: 'Uint8', value: this.players.length + this.npcs.length });
-        this.players.concat(this.npcs).forEach(character => {
+        orientations.push({ type: 'Uint8', value: this.characters.length });
+        this.characters.forEach(character => {
             orientations.push({ type: 'Uint32', value: character.id });
             orientations.push({ type: 'Float32', value: character.x });
             orientations.push({ type: 'Float32', value: character.y });
@@ -432,8 +422,8 @@ class Game {
 
         // send character healths
         let healths = [];
-        healths.push({ type: 'Uint8', value: this.players.length + this.npcs.length });
-        this.players.concat(this.npcs).forEach(character => {
+        healths.push({ type: 'Uint8', value: this.characters.length });
+        this.characters.forEach(character => {
             healths.push({ type: 'Uint32', value: character.id });
             healths.push({ type: 'Int32', value: character.health });
         });
@@ -585,6 +575,12 @@ function createIdentityMatrix(size) {
     return matrix;
 }
 
+function isIntersecting(physicsBoxA, physicsBoxB) {
+    return (physicsBoxA.minX <= physicsBoxB.maxX && physicsBoxA.maxX >= physicsBoxB.minX) &&
+        (physicsBoxA.minY <= physicsBoxB.maxY && physicsBoxA.maxY >= physicsBoxB.minY) &&
+        (physicsBoxA.minZ <= physicsBoxB.maxZ && physicsBoxA.maxZ >= physicsBoxB.minZ);
+}
+
 const game = new Game();
 
 setInterval(function () {
@@ -601,7 +597,7 @@ setInterval(function () {
 setInterval(function () {
     ws_server.clients.forEach(websocket => {
         if (websocket.isAlive === false) {
-            game.players.splice(game.players.indexOf(websocket.player), 1);
+            game.characters.splice(game.characters.indexOf(websocket.player), 1);
             broadcast(createBinaryFrame(6, [{ type: 'Uint32', value: websocket.player.id }]), websocket);
             return websocket.terminate();
         }
