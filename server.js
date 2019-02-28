@@ -316,6 +316,17 @@ class Game {
             combat: {} // cooldowns, etc.
         };
 
+        character.physicsBox = {
+            minX: character.x - 3 / 2,
+            maxX: character.x + 3 / 2,
+
+            minY: character.y - 3 / 2,
+            maxY: character.y + 3 / 2,
+
+            minZ: character.z - 3 / 2,
+            maxZ: character.z + 3 / 2
+        };
+
         this.players.push(character); // list name will change
         return character;
     }
@@ -382,6 +393,15 @@ class Game {
                 character.x += rotationMatrix[0][2] * character.movement_speed;
                 character.y += rotationMatrix[1][2] * character.movement_speed;
                 character.z += rotationMatrix[2][2] * character.movement_speed;
+
+                character.physicsBox.minX = character.x - 3 / 2;
+                character.physicsBox.maxX = character.x + 3 / 2;
+
+                character.physicsBox.minY = character.y - 3 / 2;
+                character.physicsBox.maxY = character.y + 3 / 2;
+
+                character.physicsBox.minZ = character.z - 3 / 2;
+                character.physicsBox.maxZ = character.z + 3 / 2;
             });
     }
 
