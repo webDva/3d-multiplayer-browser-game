@@ -457,25 +457,6 @@ function createMatrix(rows, columns) {
     return matrix;
 }
 
-function transposeMatrix(matrix, rows, columns) {
-    let newMatrix = createMatrix(rows, columns);
-    for (let i = 0; i < rows; i++) {
-        for (let j = 0; j < columns; j++) {
-            newMatrix[j][i] = matrix[i][j];
-        }
-    }
-    return newMatrix;
-}
-
-function normalize(x, y, z) {
-    const magnitude = Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2) + Math.pow(z, 2));
-    if (magnitude > 0) {
-        return [x / magnitude, y / magnitude, z / magnitude];
-    } else {
-        return [0, 0, 0];
-    }
-}
-
 function multiplyMatrices(A, rowsA, columnsA, B, rowsB, columnsB) {
     if (columnsA !== rowsB) {
         return null;
@@ -537,10 +518,6 @@ function generateRotationMatrixFromEuler(X, Y, Z) {
     return finalRotationMatrix;
 }
 
-function clampAngle(angle) {
-    return angle % (Math.PI * 2);
-}
-
 function preventGimbalLock(angle) {
     const X_ANGLE_THRESHOLD = 87;
     const degrees = angle * 180 / Math.PI;
@@ -550,29 +527,6 @@ function preventGimbalLock(angle) {
         angle = -X_ANGLE_THRESHOLD * Math.PI / 180;
     }
     return angle;
-}
-
-/**
- * @return {[][]} Column-major translation matrix.
- */
-function createTranslationMatrix(x, y, z) {
-    let translationMatrix = createIdentityMatrix(4);
-    fillColumnVector(translationMatrix, 3, [x, y, z, 1]);
-    return translationMatrix;
-}
-
-function createIdentityMatrix(size) {
-    let matrix = createMatrix(size, size);
-
-    for (let i = 0; i < size; i++) {
-        for (let j = 0; j < size; j++) {
-            if (i === j) {
-                matrix[i][j] = 1;
-            }
-        }
-    }
-
-    return matrix;
 }
 
 function isIntersecting(physicsBoxA, physicsBoxB) {
