@@ -66,16 +66,9 @@ function create_character(id, x, y, z, eulerX, eulerY, type) {
             health: 0,
             type: type
         };
-
-        const copy = player_list;
-        copy.push(player_struct);
-        player_list = Array.from(new Set(copy.map(struct => struct.id)))
-            .map(id => {
-                return copy.find(struct => struct.id === id);
-            });
-
-        mesh.position.x = x;
-        mesh.position.y = y;
+        player_list.push(player_struct);
+        mesh.position.z = x;
+        mesh.position.x = y;
         mesh.position.z = z;
         mesh.rotation.x = eulerX;
         mesh.rotation.y = eulerY;
