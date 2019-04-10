@@ -11,16 +11,26 @@ const scene = new BABYLON.Scene(engine);
 
 scene.clearColor = new BABYLON.Color3(1, 1, 1);
 
-const camera = new BABYLON.UniversalCamera('camera', new BABYLON.Vector3(0, 0, 0), scene);
+const camera = new BABYLON.FollowCamera('camera', new BABYLON.Vector3(0, 0, 0), scene);
+//const camera = new BABYLON.UniversalCamera('camera', new BABYLON.Vector3(0, 0, 0), scene);
 //const camera = new BABYLON.ArcRotateCamera("Camera", 1, 1, 4, new BABYLON.Vector3(-10, 10, 20), scene);
 camera.attachControl(canvas, false);
 
-const light = new BABYLON.PointLight("light", new BABYLON.Vector3(0, 0, 0), scene);
+// ground mesh
+const groundSize = 100;
+const ground = BABYLON.Mesh.CreateGround("ground", groundSize, groundSize, 1, scene);
+ground.setPivotMatrix(BABYLON.Matrix.Translation(groundSize / 2, 0, groundSize / 2), false);
+ground.position.y = -1;
+ground.material = new BABYLON.GridMaterial('groundMaterial', scene);
+ground.material.mainColor = new BABYLON.Color3(0.75, 0.75, 0.75);
+ground.material.lineColor = new BABYLON.Color3(0.5, 0.5, 0.5);
+ground.material.gridRatio = 1;
+ground.material.majorUnitFrequency = 2;
+
+// light
+const light = new BABYLON.PointLight('light', new BABYLON.Vector3(groundSize / 2, 100, groundSize / 2), scene);
 light.diffuse = new BABYLON.Color3(1, 1, 1);
 light.specular = new BABYLON.Color3(1, 1, 1);
-
-// highlight layer for highlighting meshes
-const targetSelectionHighlightLayer = new BABYLON.HighlightLayer("highlightlayer", scene);
 
 const player = {
     id: null,
@@ -28,13 +38,10 @@ const player = {
     struct: null,
 
     movement: {
-        isRotating: false,
-        // requested orientation
-        eulerX: 0,
-        eulerY: 0,
-
-        // boost
-        boost: false
+        left: false,
+        up: false,
+        right: false,
+        down: false,
     },
 
     combat: {
@@ -45,42 +52,64 @@ let player_list = [];
 let session_started = false;
 const projectile_list = [];
 
-function create_character(id, x, y, z, eulerX, eulerY, type) {
-    BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'kship.babylon', scene).then(function (imported) {
-        const mesh = imported.meshes[0];
+function create_character(id, x, z, eulerY, type) {
+    const mesh = BABYLON.MeshBuilder.CreateBox('', { diameter: 1 }, scene);
+    mesh.material = new BABYLON.StandardMaterial('', scene);
+    mesh.material.diffuseColor = BABYLON.Color3.Blue();
 
-        if (type === 0) { // if an NPC
-            mesh.material = new BABYLON.StandardMaterial('', scene);
-            mesh.material.diffuseColor = BABYLON.Color3.Red();
-        }
+    if (type === 0) { // if an NPC
+        mesh.material.diffuseColor = BABYLON.Color3.Red();
+    }
 
-        mesh.KGAME_TYPE = 1; // KGAME_TYPE 1 means that it is a kawaii game mesh of type 1
-        const player_struct = {
-            id: id,
-            x: x,
-            y: y,
-            z: z,
-            mesh: mesh,
-            eulerX: eulerX,
-            eulerY: eulerY,
-            health: 0,
-            type: type
-        };
-        player_list.push(player_struct);
-        mesh.position.z = x;
-        mesh.position.x = y;
-        mesh.position.z = z;
-        mesh.rotation.x = eulerX;
-        mesh.rotation.y = eulerY;
+    mesh.KGAME_TYPE = 1; // KGAME_TYPE 1 means that it is a kawaii game mesh of type 1
+    const player_struct = {
+        id: id,
+        x: x,
+        z: z,
+        mesh: mesh,
+        eulerY: eulerY,
+        health: 0,
+        type: type
+    };
+    player_list.push(player_struct);
+    mesh.position.x = x;
+    mesh.position.z = z;
+    mesh.rotation.y = eulerY;
 
-        if (player.id === id) {
-            player.mesh = mesh;
-            player.struct = player_struct;
-            //camera.target = player.mesh;
+    if (player.id === id) {
+        player.mesh = mesh;
+        player.struct = player_struct;
+        camera.lockedTarget = player.mesh;
+        //camera.target = player.mesh;
 
-            session_started = true;
-        }
-    });
+        session_started = true;
+    }
+}
+
+// particle system handling subsystem
+function create_particles(xPosition, zPosition) {
+    const particleSystem = new BABYLON.ParticleSystem('', 500, scene);
+
+    particleSystem.particleTexture = new BABYLON.Texture('/assets/particle_texture.png', scene);
+    particleSystem.color1 = new BABYLON.Color4(1, 0, 0, 1);
+    particleSystem.color2 = new BABYLON.Color4(1, 1, 1, 1);
+    particleSystem.colorDead = new BABYLON.Color4(0, 0, 0, 0);
+    particleSystem.minSize = 0.1;
+    particleSystem.maxSize = 1.2;
+    particleSystem.minLifeTime = 0.1;
+    particleSystem.maxLifeTime = 0.7;
+    particleSystem.emitRate = 400;
+    particleSystem.blendMode = BABYLON.ParticleSystem.BLENDMODE_MULTIPLYADD;
+    particleSystem.gravity = new BABYLON.Vector3(0, 0, 0);
+    particleSystem.minEmitPower = 1;
+    particleSystem.maxEmitPower = 5;
+    particleSystem.updateSpeed = 0.005;
+    particleSystem.emitter = new BABYLON.Vector3(xPosition, 0, zPosition);
+    particleSystem.createSphereEmitter(1);
+
+    particleSystem.start();
+
+    return particleSystem;
 }
 
 // configure WebSocket client
@@ -106,48 +135,30 @@ websocket.onmessage = (event) => {
 
         // player orientations
         if (dataview.getUint8(0) === 1) {
-            for (let i = 0; i < dataview.getUint8(1); i++) {
-                const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(2 + i * 24));
+            for (let i = 0; i < dataview.getUint16(1); i++) {
+                const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(3 + i * 16));
                 if (player_object) {
-                    player_object.x = dataview.getFloat32(6 + i * 24);
-                    player_object.y = dataview.getFloat32(10 + i * 24);
-                    player_object.z = dataview.getFloat32(14 + i * 24);
-                    player_object.eulerX = dataview.getFloat32(18 + i * 24);
-                    player_object.eulerY = dataview.getFloat32(22 + i * 24);
+                    player_object.x = dataview.getFloat32(7 + i * 16);
+                    player_object.z = dataview.getFloat32(11 + i * 16);
+                    player_object.eulerY = dataview.getFloat32(15 + i * 16);
                 }
             }
         }
 
-        // attacks
-        if (dataview.getUint8(0) === 2) {
-            const attacker = player_list.find(player_object => player_object.id === dataview.getUint32(1));
-            const target = player_list.find(player_object => player_object.id === dataview.getUint32(5));
-        }
-
         // new player joins
         if (dataview.getUint8(0) === 4) {
-            create_character(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getFloat32(13), dataview.getFloat32(17), dataview.getFloat32(21), dataview.getInt8(25));
+            create_character(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getFloat32(13), dataview.getInt8(17));
         }
 
         // new projectiles
         if (dataview.getUint8(0) === 5) {
             const projectile = {
-                mesh: BABYLON.MeshBuilder.CreateSphere("sphere", {}, scene),
-                position: {
-                    x: dataview.getFloat32(1),
-                    y: dataview.getFloat32(5),
-                    z: dataview.getFloat32(9)
-                },
-                forwardVector: {
-                    x: dataview.getFloat32(13),
-                    y: dataview.getFloat32(17),
-                    z: dataview.getFloat32(21)
-                },
+                particleSystem: create_particles(dataview.getFloat32(1), dataview.getFloat32(5)),
+                forwardVector: dataview.getFloat32(9),
                 creationTime: Date.now(),
-                speed: dataview.getFloat32(25),
-                owner: dataview.getUint32(29)
+                speed: dataview.getFloat32(13),
+                owner: dataview.getUint32(17)
             };
-            projectile.mesh.position = new BABYLON.Vector3(projectile.position.x, projectile.position.y, projectile.position.z);
             projectile_list.push(projectile);
         }
 
@@ -161,10 +172,10 @@ websocket.onmessage = (event) => {
 
         // player healths update
         if (dataview.getUint8(0) === 9) {
-            for (let i = 0; i < dataview.getUint8(1); i++) {
-                const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(2 + i * 8));
+            for (let i = 0; i < dataview.getUint16(1); i++) {
+                const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(3 + i * 8));
                 if (player_object) {
-                    player_object.health = dataview.getInt32(6 + i * 8);
+                    player_object.health = dataview.getInt32(7 + i * 8);
                 }
             }
         }
@@ -176,118 +187,55 @@ websocket.onmessage = (event) => {
 }
 
 // display DOM user interface
-const uiCrosshair = document.getElementById('crosshair');
-uiCrosshair.style.display = 'block';
-uiCrosshair.style.left = window.innerWidth / 2 - uiCrosshair.getBoundingClientRect().width / 2 + 'px';
-uiCrosshair.style.top = window.innerHeight / 2 - uiCrosshair.getBoundingClientRect().height / 2 + 'px';
 
-const uiJoystick = document.getElementById('joystick');
-uiJoystick.style.display = 'block';
-
-const fireButton = document.getElementById('fire-button');
-fireButton.style.display = 'block';
-
-const boostButton = document.getElementById('boost-button');
-boostButton.style.display = 'block';
-
-function rotatePlayer(eventClientX, eventClientY) {
-    const joystickPositionInfo = uiJoystick.getBoundingClientRect();
-    const yawAmount = eventClientX - joystickPositionInfo.width / 2;
-    const pitchAmount = eventClientY - joystickPositionInfo.height / 2;
-
-    const controlSensitivity = 0.001;
-    player.movement.eulerX = -pitchAmount * controlSensitivity;
-    player.movement.eulerY = yawAmount * controlSensitivity;
-
-    player.movement.isRotating = true;
-}
-
-uiJoystick.onpointerdown = function (event) {
-    const bounds = event.target.getBoundingClientRect();
-    rotatePlayer(event.clientX - bounds.left, event.clientY - bounds.top);
-
-    const thumbstick = document.getElementById('thumbstick');
-    thumbstick.style.display = 'block';
-    const thumbstickPositionInfo = thumbstick.getBoundingClientRect();
-    thumbstick.style.left = event.clientX - thumbstickPositionInfo.width / 2 + 'px';
-    thumbstick.style.top = event.clientY - thumbstickPositionInfo.height / 2 + 'px';
-};
-
-uiJoystick.onpointermove = function (event) {
-    if (player.movement.isRotating) {
-        const bounds = event.target.getBoundingClientRect();
-        rotatePlayer(event.clientX - bounds.left, event.clientY - bounds.top);
-
-        const thumbstick = document.getElementById('thumbstick');
-        thumbstick.style.display = 'block';
-        const thumbstickPositionInfo = thumbstick.getBoundingClientRect();
-        thumbstick.style.left = event.clientX - thumbstickPositionInfo.width / 2 + 'px';
-        thumbstick.style.top = event.clientY - thumbstickPositionInfo.height / 2 + 'px';
-    }
-};
-
-uiJoystick.onpointerup = function () {
-    document.getElementById('thumbstick').style.display = 'none';
-    player.movement.isRotating = false;
-};
-
-// fire button
-fireButton.onpointerdown = function (event) {
-    player.combat.attack = true;
-};
-
-fireButton.onpointerup = function (event) {
-    player.combat.attack = false;
-};
-
-boostButton.onpointerdown = function (event) {
-    player.movement.boost = true;
-};
-
-boostButton.onpointerup = function (event) {
-    player.movement.boost = false;
-};
 
 // open the WebSocket connection
 websocket.onopen = () => {
     websocket.send(JSON.stringify({ type: 'join' }));
 };
 
-for (let i = 0; i < 1500; i++) {
-    const dummy = BABYLON.MeshBuilder.CreateBox("box", { diameter: 20 }, scene);
-    dummy.position.x = Math.floor(Math.random() * (200 - -200) + -200);
-    dummy.position.y = Math.floor(Math.random() * (200 - -200) + -200);
-    dummy.position.z = Math.floor(Math.random() * (200 - -200) + -200);
-    dummy.material = new BABYLON.StandardMaterial("standardmaterial", scene);
-}
-
+// movement controls
 document.addEventListener('keydown', function (event) {
-    const arraybuffer = new ArrayBuffer(20);
-    const dataview = new DataView(arraybuffer);
     const char = String.fromCharCode(event.keyCode);
-    switch (char) {
-        case 'W':
-            dataview.setUint8(0, 1);
-            dataview.setUint8(1, 1);
-            websocket.send(dataview);
-            break;
-        case 'F':
-            dataview.setUint8(0, 1);
-            dataview.setUint8(1, 0);
-            websocket.send(dataview);
-            break;
+    if (char === 'W') {
+        player.movement.up = true;
+        player.mesh.position.z += 0.5;
+    }
+    if (char === 'A') {
+        player.movement.left = true;
+        player.mesh.position.x -= 0.5;
+    }
+    if (char === 'S') {
+        player.movement.down = true;
+        player.mesh.position.z -= 0.5;
+    }
+    if (char === 'D') {
+        player.movement.right = true;
+        player.mesh.position.x += 0.5;
     }
 });
 
+document.onpointerdown = function () {
+    const pickResult = scene.pick(scene.pointerX, scene.pointerY);
+    if (pickResult.hit) {
+        player.combat.attack = true;
+    }
+};
+
+document.onpointerup = function () {
+    player.combat.attack = false;
+};
+
 // client network update pulse
 setInterval(() => {
-    // player wants to rotate their flying craft
-    if (player.movement.isRotating) {
-        const arraybuffer = new ArrayBuffer(9);
+    // player rotation
+    const pickResult = scene.pick(scene.pointerX, scene.pointerY);
+    if (pickResult.pickedPoint) {
+        const angle = Math.atan2(pickResult.pickedPoint.z - player.mesh.position.z, pickResult.pickedPoint.x - player.mesh.position.x);
+        const arraybuffer = new ArrayBuffer(5);
         const dataview = new DataView(arraybuffer);
         dataview.setUint8(0, 1);
-        dataview.setFloat32(1, player.movement.eulerX);
-        dataview.setFloat32(5, player.movement.eulerY);
+        dataview.setFloat32(1, angle);
         websocket.send(dataview);
     }
 
@@ -299,12 +247,38 @@ setInterval(() => {
         websocket.send(dataview);
     }
 
-    // boost
-    if (player.movement.boost) {
-        const arraybuffer = new ArrayBuffer(1);
+    // send player movement requests
+    if (player.movement.up) {
+        const arraybuffer = new ArrayBuffer(2);
         const dataview = new DataView(arraybuffer);
         dataview.setUint8(0, 3);
+        dataview.setUint8(1, 2);
         websocket.send(dataview);
+        player.movement.up = false;
+    }
+    if (player.movement.left) {
+        const arraybuffer = new ArrayBuffer(2);
+        const dataview = new DataView(arraybuffer);
+        dataview.setUint8(0, 3);
+        dataview.setUint8(1, 1);
+        websocket.send(dataview);
+        player.movement.left = false;
+    }
+    if (player.movement.down) {
+        const arraybuffer = new ArrayBuffer(2);
+        const dataview = new DataView(arraybuffer);
+        dataview.setUint8(0, 3);
+        dataview.setUint8(1, 4);
+        websocket.send(dataview);
+        player.movement.down = false;
+    }
+    if (player.movement.right) {
+        const arraybuffer = new ArrayBuffer(2);
+        const dataview = new DataView(arraybuffer);
+        dataview.setUint8(0, 3);
+        dataview.setUint8(1, 3);
+        websocket.send(dataview);
+        player.movement.right = false;
     }
 }, 1000 / 20);
 
@@ -323,28 +297,23 @@ setInterval(() => {
         if (deltaTime <= lerpTime) { // lerp
             player_list.forEach(player_object => {
                 player_object.mesh.position.x = lerp(player_object.mesh.position.x, player_object.x, deltaTime / lerpTime);
-                player_object.mesh.position.y = lerp(player_object.mesh.position.y, player_object.y, deltaTime / lerpTime);
                 player_object.mesh.position.z = lerp(player_object.mesh.position.z, player_object.z, deltaTime / lerpTime);
 
-                player_object.mesh.rotation.x = lerp(player_object.mesh.rotation.x, player_object.eulerX, deltaTime / lerpTime);
                 player_object.mesh.rotation.y = lerp(player_object.mesh.rotation.y, player_object.eulerY, deltaTime / lerpTime);
             });
         } else { // don't lerp
             player_list.forEach(player_object => {
                 player_object.mesh.position.x = player_object.x;
-                player_object.mesh.position.y = player_object.y;
                 player_object.mesh.position.z = player_object.z;
 
-                player_object.mesh.rotation.x = player_object.eulerX;
                 player_object.mesh.rotation.y = player_object.eulerY;
             });
         }
 
-        // projectile movement
+        // projectile particle systems movement
         projectile_list.forEach(projectile => {
-            projectile.mesh.position.x += projectile.forwardVector.x * projectile.speed;
-            projectile.mesh.position.y += projectile.forwardVector.y * projectile.speed;
-            projectile.mesh.position.z += projectile.forwardVector.z * projectile.speed;
+            projectile.particleSystem.emitter.x += Math.cos(projectile.forwardVector) * projectile.speed;
+            projectile.particleSystem.emitter.z += Math.sin(projectile.forwardVector) * projectile.speed;
         });
     }
 
@@ -354,14 +323,14 @@ setInterval(() => {
 // mostly for game logic and animation stuff
 scene.registerBeforeRender(function () {
     if (session_started) {
-        // camera position and rotation
-        camera.position = player.mesh.position;
-        camera.rotation = player.mesh.rotation;
+        camera.position.x = player.mesh.position.x;
+        camera.position.y = player.mesh.position.y + 25;
+        camera.position.z = player.mesh.position.z - 25;
 
         // remove expired projectiles on the client side
         projectile_list.forEach(projectile => {
             if (Date.now() - projectile.creationTime > 10000) {
-                projectile.mesh.dispose();
+                projectile.particleSystem.stop();
                 projectile_list.splice(projectile_list.indexOf(projectile), 1);
             }
         });
@@ -374,6 +343,4 @@ engine.runRenderLoop(function () {
 
 window.addEventListener("resize", function () {
     engine.resize();
-    uiCrosshair.style.left = window.innerWidth / 2 - uiCrosshair.getBoundingClientRect().width / 2 + 'px';
-    uiCrosshair.style.top = window.innerHeight / 2 - uiCrosshair.getBoundingClientRect().height / 2 + 'px';
 });

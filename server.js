@@ -10,7 +10,6 @@ const gcc = require('@node-minify/google-closure-compiler');
 const htmlMinifier = require('@node-minify/html-minifier');
 const cleanCSS = require('@node-minify/clean-css');
 
-const config = require('./config.json');
 const env = require('./env.json')[process.env.NODE_ENV || 'development'];
 
 if (env.production) {
@@ -51,6 +50,18 @@ if (env.production) {
     });
 }
 
+const config = {
+    "PORT": 3000,
+    "networkUpdatePulseRate": 10,
+    "physicsTickRate": 30,
+    "player": {
+        "defaultMovementSpeed": 1,
+        "radius": 3
+    },
+    "mapSize": 100,
+    "pingTime": 40
+};
+
 app.use(express.static(__dirname + '/client'));
 
 const PORT = process.env.PORT || config.PORT;
@@ -58,8 +69,15 @@ httpServer.listen(PORT, function () {
     console.log(`HTTP server started on port ${PORT}.`);
 });
 
-function randomUint32() {
-    return crypto.randomBytes(4).readUInt32BE(0, true);
+function randomUint32ID(listOfObjects, usedIDsList) {
+    // the items in the first array must have an .id property for this to work
+    let newID = crypto.randomBytes(4).readUInt32BE(0, true);
+    while (listOfObjects.find(object => object.id === newID) && usedIDsList.find(id => id === newID)) {
+        newID = crypto.randomBytes(4).readUInt32BE(0, true);
+    }
+
+    usedIDsList.push(newID);
+    return newID;
 }
 
 function broadcast(data, exception = null) {
@@ -177,9 +195,7 @@ ws_server.on('connection', websocket => {
                 broadcast(createBinaryFrame(4, [
                     { type: 'Uint32', value: websocket.player.id },
                     { type: 'Float32', value: websocket.player.x },
-                    { type: 'Float32', value: websocket.player.y },
                     { type: 'Float32', value: websocket.player.z },
-                    { type: 'Float32', value: websocket.player.eulerX },
                     { type: 'Float32', value: websocket.player.eulerY },
                     { type: 'Int8', value: 1 } // player type and not an NPC type
                 ]), websocket);
@@ -192,9 +208,7 @@ ws_server.on('connection', websocket => {
                     transmit(createBinaryFrame(4, [
                         { type: 'Uint32', value: character.id },
                         { type: 'Float32', value: character.x },
-                        { type: 'Float32', value: character.y },
                         { type: 'Float32', value: character.z },
-                        { type: 'Float32', value: character.eulerX },
                         { type: 'Float32', value: character.eulerY },
                         { type: 'Int8', value: character.type ? 1 : 0 } // 1 if is a player and 0 if an NPC
                     ]), websocket);
@@ -205,40 +219,25 @@ ws_server.on('connection', websocket => {
         if (message instanceof ArrayBuffer) {
             const client_dataview = new DataView(message);
 
-            // player movement
+            // player aiming
             if (client_dataview.getUint8(0) === 1) {
                 const player = websocket.player;
-
-                const xInc = client_dataview.getFloat32(1);
-                const yInc = client_dataview.getFloat32(5);
-
-                player.eulerX = preventGimbalLock(player.eulerX + xInc);
-                player.eulerY += yInc;
+                player.eulerY = client_dataview.getFloat32(1);
             }
 
             // player is shooting a projectile
             if (client_dataview.getUint8(0) === 2) {
                 const player = websocket.player;
                 if (player.isAlive) {
-                    const rotationMatrix = generateRotationMatrixFromEuler(player.eulerX, player.eulerY, 0);
-                    const playerForwardVector = [rotationMatrix[0][2], rotationMatrix[1][2], rotationMatrix[2][2]];
                     const projectile = {
                         position: {
                             x: player.x,
-                            y: player.y,
                             z: player.z,
                         },
-                        forwardVector: {
-                            x: playerForwardVector[0],
-                            y: playerForwardVector[1],
-                            z: playerForwardVector[2]
-                        },
+                        forwardVector: player.eulerY,
                         physicsBox: {
                             minX: player.x - 3 / 2,
                             maxX: player.x + 3 / 2,
-
-                            minY: player.y - 3 / 2,
-                            maxY: player.y + 3 / 2,
 
                             minZ: player.z - 3 / 2,
                             maxZ: player.z + 3 / 2
@@ -247,17 +246,19 @@ ws_server.on('connection', websocket => {
                         creationTime: Date.now(),
                         owner: player.id
                     };
-
                     game.projectiles.push(projectile);
                     game.networkUpdates.combat.newProjectiles.push(projectile);
                 }
             }
 
-            // stop button pressed
+            // player wants to move
             if (client_dataview.getUint8(0) === 3) {
                 const player = websocket.player;
 
-                player.movement_speed = 0;
+                // player moves, aiming mode or not
+                if (player.isAlive) {
+                    player.isMoving = client_dataview.getUint8(1);
+                }
             }
         }
     });
@@ -287,28 +288,24 @@ class Game {
         this.npcs = [];
         //const npc = this.addNPC();
         this.projectiles = [];
+        // used IDs
+        this.usedCharacterIDs = [];
+        this.usedCollectibleIDs = [];
     }
 
     addCharacter(isHumanPlayer = true) {
-        let id = randomUint32();
-        while (this.characters.find(character => character.id === id)) {
-            id = randomUint32();
-        }
-
         const character = {
-            id: id,
+            id: randomUint32ID(this.characters, this.usedCharacterIDs),
             type: isHumanPlayer, // true for player and false for NPC. TODO: create additional logic for NPCs inside this function
 
             // initial orientation
-            x: Math.random() * (this.mapSize - -this.mapSize) + -this.mapSize,
-            y: Math.random() * (this.mapSize - -this.mapSize) + -this.mapSize,
-            z: Math.random() * (this.mapSize - -this.mapSize) + -this.mapSize,
+            x: Math.random() * this.mapSize,
+            z: Math.random() * this.mapSize,
             // rotations have to be zero initially
-            eulerX: 0,
             eulerY: 0,
 
-            //movement_speed: config.player.defaultMovementSpeed, // speed will be a ratio of the throttle speed and character maximum movement speed
-            movement_speed: 0.1,
+            movement_speed: config.player.defaultMovementSpeed,
+            isMoving: false, // false not moving, 1 left, 2 up, 3 right, 4 down
 
             // collision
             radius: config.player.radius,
@@ -327,9 +324,6 @@ class Game {
             minX: character.x - 3 / 2,
             maxX: character.x + 3 / 2,
 
-            minY: character.y - 3 / 2,
-            maxY: character.y + 3 / 2,
-
             minZ: character.z - 3 / 2,
             maxZ: character.z + 3 / 2
         };
@@ -345,32 +339,27 @@ class Game {
     physicsLoop() {
         // projectile movement
         this.projectiles.forEach(projectile => {
-            projectile.position.x += projectile.forwardVector.x * projectile.speed;
-            projectile.position.y += projectile.forwardVector.y * projectile.speed;
-            projectile.position.z += projectile.forwardVector.z * projectile.speed;
+            projectile.position.x += Math.cos(projectile.forwardVector) * projectile.speed;
+            projectile.position.z += Math.sin(projectile.forwardVector) * projectile.speed;
 
             // move the projectile's physics box as well
             projectile.physicsBox.minX = projectile.position.x - 3 / 2;
             projectile.physicsBox.maxX = projectile.position.x + 3 / 2;
-
-            projectile.physicsBox.minY = projectile.position.y - 3 / 2;
-            projectile.physicsBox.maxY = projectile.position.y + 3 / 2;
 
             projectile.physicsBox.minZ = projectile.position.z - 3 / 2;
             projectile.physicsBox.maxZ = projectile.position.z + 3 / 2;
         });
 
         // player and NPC movement
-        this.characters.filter(character => { // collision detection
-            // for now, there is no collision detection
-            return true;
+        this.characters.filter(character => {
+            return character.isMoving;
         })
+            .filter(character => { // collision detection
+                // for now, there is no collision detection
+                return true;
+            })
             .forEach(character => {
-                const rotationMatrix = generateRotationMatrixFromEuler(character.eulerX, character.eulerY, 0);
-
-                character.x += rotationMatrix[0][2] * character.movement_speed;
-                character.y += rotationMatrix[1][2] * character.movement_speed;
-                character.z += rotationMatrix[2][2] * character.movement_speed;
+                moveCharacter(character, character.isMoving);
 
                 character.physicsBox.minX = character.x - 3 / 2;
                 character.physicsBox.maxX = character.x + 3 / 2;
@@ -409,35 +398,30 @@ class Game {
     sendNetworkUpdates() {
         // send player and NPC orientations
         let orientations = [];
-        orientations.push({ type: 'Uint8', value: this.characters.length });
+        orientations.push({ type: 'Uint16', value: this.characters.length });
         this.characters.forEach(character => {
             orientations.push({ type: 'Uint32', value: character.id });
             orientations.push({ type: 'Float32', value: character.x });
-            orientations.push({ type: 'Float32', value: character.y });
             orientations.push({ type: 'Float32', value: character.z });
-            orientations.push({ type: 'Float32', value: character.eulerX });
             orientations.push({ type: 'Float32', value: character.eulerY });
         });
         broadcast(createBinaryFrame(1, orientations));
 
         // send character healths
         let healths = [];
-        healths.push({ type: 'Uint8', value: this.characters.length });
+        healths.push({ type: 'Uint16', value: this.characters.length });
         this.characters.forEach(character => {
             healths.push({ type: 'Uint32', value: character.id });
             healths.push({ type: 'Int32', value: character.health });
         });
         broadcast(createBinaryFrame(9, healths));
 
-        // new projectiles
+        // new projectiles. may need to bulk send this too like orientations
         this.networkUpdates.combat.newProjectiles.forEach(projectile => {
             broadcast(createBinaryFrame(5, [
                 { type: 'Float32', value: projectile.position.x },
-                { type: 'Float32', value: projectile.position.y },
                 { type: 'Float32', value: projectile.position.z },
-                { type: 'Float32', value: projectile.forwardVector.x },
-                { type: 'Float32', value: projectile.forwardVector.y },
-                { type: 'Float32', value: projectile.forwardVector.z },
+                { type: 'Float32', value: projectile.forwardVector },
                 { type: 'Float32', value: projectile.speed },
                 { type: 'Uint32', value: projectile.owner }
             ]));
@@ -446,87 +430,20 @@ class Game {
     }
 }
 
-function createMatrix(rows, columns) {
-    let matrix = [];
-    for (let i = 0; i < rows; i++) {
-        matrix[i] = [];
-        for (let j = 0; j < columns; j++) {
-            matrix[i][j] = 0;
-        }
+function moveCharacter(character, direction) {
+    if (direction === 1) {
+        character.x -= character.movement_speed;
     }
-    return matrix;
-}
-
-function multiplyMatrices(A, rowsA, columnsA, B, rowsB, columnsB) {
-    if (columnsA !== rowsB) {
-        return null;
+    if (direction === 2) {
+        character.z += character.movement_speed;
     }
-    let newMatrix = createMatrix(rowsA, columnsB);
-    for (let i = 0; i < rowsA; i++) {
-        for (let j = 0; j < columnsB; j++) {
-            for (let k = 0; k < columnsA; k++) {
-                newMatrix[i][j] += A[i][k] * B[k][j];
-            }
-        }
+    if (direction === 3) {
+        character.x += character.movement_speed;
     }
-    return newMatrix;
-}
-
-function generateXRotationMatrix(angle) {
-    let matrix = createMatrix(4, 4);
-    fillColumnVector(matrix, 0, [1, 0, 0, 0]);
-    fillColumnVector(matrix, 1, [0, Math.cos(angle), Math.sin(angle), 0]);
-    fillColumnVector(matrix, 2, [0, -Math.sin(angle), Math.cos(angle), 0]);
-    fillColumnVector(matrix, 3, [0, 0, 0, 1]);
-    return matrix;
-}
-
-function generateYRotationMatrix(angle) {
-    let matrix = createMatrix(4, 4);
-    fillColumnVector(matrix, 0, [Math.cos(angle), 0, -Math.sin(angle), 0]);
-    fillColumnVector(matrix, 1, [0, 1, 0, 0]);
-    fillColumnVector(matrix, 2, [Math.sin(angle), 0, Math.cos(angle), 0]);
-    fillColumnVector(matrix, 3, [0, 0, 0, 1]);
-    return matrix;
-}
-
-function generateZRotationMatrix(angle) {
-    let matrix = createMatrix(4, 4);
-    fillColumnVector(matrix, 0, [Math.cos(angle), Math.sin(angle), 0, 0]);
-    fillColumnVector(matrix, 1, [-Math.sin(angle), Math.cos(angle), 0, 0]);
-    fillColumnVector(matrix, 2, [0, 0, 1, 0]);
-    fillColumnVector(matrix, 3, [0, 0, 0, 1]);
-    return matrix;
-}
-
-function fillColumnVector(columnMajorMatrix, column, columnVectorArray) {
-    for (let i = 0; i < 4; i++) {
-        columnMajorMatrix[i][column] = columnVectorArray[i];
+    if (direction === 4) {
+        character.z -= character.movement_speed;
     }
-}
-
-/**
- * @return {[][]} Column-major rotation matrix.
- */
-function generateRotationMatrixFromEuler(X, Y, Z) {
-    const xRotationMatrix = generateXRotationMatrix(X);
-    const yRotationMatrix = generateYRotationMatrix(Y);
-    const zRotationMatrix = generateZRotationMatrix(Z);
-
-    const yxRotationMatrix = multiplyMatrices(yRotationMatrix, 4, 4, xRotationMatrix, 4, 4);
-    const finalRotationMatrix = multiplyMatrices(yxRotationMatrix, 4, 4, zRotationMatrix, 4, 4);
-    return finalRotationMatrix;
-}
-
-function preventGimbalLock(angle) {
-    const X_ANGLE_THRESHOLD = 87;
-    const degrees = angle * 180 / Math.PI;
-    if (degrees > X_ANGLE_THRESHOLD) {
-        angle = X_ANGLE_THRESHOLD * Math.PI / 180;
-    } else if (degrees < -X_ANGLE_THRESHOLD) {
-        angle = -X_ANGLE_THRESHOLD * Math.PI / 180;
-    }
-    return angle;
+    character.isMoving = false;
 }
 
 function isIntersecting(physicsBoxA, physicsBoxB) {
