@@ -196,7 +196,7 @@ ws_server.on('connection', websocket => {
                     { type: 'Uint32', value: websocket.player.id },
                     { type: 'Float32', value: websocket.player.x },
                     { type: 'Float32', value: websocket.player.z },
-                    { type: 'Float32', value: websocket.player.eulerY },
+                    { type: 'Uint8', value: websocket.player.direction },
                     { type: 'Int8', value: 1 } // player type and not an NPC type
                 ]), websocket);
             }
@@ -209,7 +209,7 @@ ws_server.on('connection', websocket => {
                         { type: 'Uint32', value: character.id },
                         { type: 'Float32', value: character.x },
                         { type: 'Float32', value: character.z },
-                        { type: 'Float32', value: character.eulerY },
+                        { type: 'Uint8', value: character.direction },
                         { type: 'Int8', value: character.type ? 1 : 0 } // 1 if is a player and 0 if an NPC
                     ]), websocket);
                 });
@@ -219,13 +219,7 @@ ws_server.on('connection', websocket => {
         if (message instanceof ArrayBuffer) {
             const client_dataview = new DataView(message);
 
-            // player aiming
-            if (client_dataview.getUint8(0) === 1) {
-                const player = websocket.player;
-                player.eulerY = client_dataview.getFloat32(1);
-            }
-
-            // player is shooting a projectile
+            // player wants to shoot a projectile
             if (client_dataview.getUint8(0) === 2) {
                 const player = websocket.player;
                 if (player.isAlive) {
@@ -234,7 +228,7 @@ ws_server.on('connection', websocket => {
                             x: player.x,
                             z: player.z,
                         },
-                        forwardVector: player.eulerY,
+                        direction: player.direction,
                         physicsBox: {
                             minX: player.x - 3 / 2,
                             maxX: player.x + 3 / 2,
@@ -255,8 +249,7 @@ ws_server.on('connection', websocket => {
             if (client_dataview.getUint8(0) === 3) {
                 const player = websocket.player;
 
-                // player moves, aiming mode or not
-                if (player.isAlive) {
+                if (player.isAlive) { // WASD: 1 = up, 2 = left, 3 = down, 4 = right
                     player.isMoving = client_dataview.getUint8(1);
                 }
             }
@@ -301,11 +294,10 @@ class Game {
             // initial orientation
             x: Math.random() * this.mapSize,
             z: Math.random() * this.mapSize,
-            // rotations have to be zero initially
-            eulerY: 0,
+            direction: 3, // WASD: 1 = up, 2 = left, 3 = down, 4 = right
 
             movement_speed: config.player.defaultMovementSpeed,
-            isMoving: false, // false not moving, 1 left, 2 up, 3 right, 4 down
+            isMoving: false, // false means not moving, 1 = up, 2 = left, 3 = down, 4 = right
 
             // collision
             radius: config.player.radius,
@@ -403,7 +395,7 @@ class Game {
             orientations.push({ type: 'Uint32', value: character.id });
             orientations.push({ type: 'Float32', value: character.x });
             orientations.push({ type: 'Float32', value: character.z });
-            orientations.push({ type: 'Float32', value: character.eulerY });
+            orientations.push({ type: 'Uint8', value: character.direction });
         });
         broadcast(createBinaryFrame(1, orientations));
 
@@ -432,16 +424,17 @@ class Game {
 
 function moveCharacter(character, direction) {
     if (direction === 1) {
-        character.x -= character.movement_speed;
-    }
-    if (direction === 2) {
         character.z += character.movement_speed;
-    }
-    if (direction === 3) {
-        character.x += character.movement_speed;
-    }
-    if (direction === 4) {
+        character.direction = 1;
+    } else if (direction === 2) {
+        character.x -= character.movement_speed;
+        character.direction = 2;
+    } else if (direction === 3) {
         character.z -= character.movement_speed;
+        character.direction = 3;
+    } else if (direction === 4) {
+        character.x += character.movement_speed;
+        character.direction = 4;
     }
     character.isMoving = false;
 }

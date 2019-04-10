@@ -48,12 +48,13 @@ const player = {
         attack: false
     }
 };
-let player_list = [];
+const player_list = [];
 let session_started = false;
 const projectile_list = [];
 
-function create_character(id, x, z, eulerY, type) {
-    const mesh = BABYLON.MeshBuilder.CreateBox('', { diameter: 1 }, scene);
+function create_character(id, x, z, direction, type) {
+    const mesh = BABYLON.MeshBuilder.CreateCylinder('', { diameterTop: 0, tessellation: 32 }, scene);
+    mesh.rotation.x = Math.PI * (1 / 2);
     mesh.material = new BABYLON.StandardMaterial('', scene);
     mesh.material.diffuseColor = BABYLON.Color3.Blue();
 
@@ -67,14 +68,14 @@ function create_character(id, x, z, eulerY, type) {
         x: x,
         z: z,
         mesh: mesh,
-        eulerY: eulerY,
+        eulerY: directionToEuler(direction),
         health: 0,
         type: type
     };
     player_list.push(player_struct);
     mesh.position.x = x;
     mesh.position.z = z;
-    mesh.rotation.y = eulerY;
+    mesh.rotation.y = player_struct.eulerY;
 
     if (player.id === id) {
         player.mesh = mesh;
@@ -83,6 +84,20 @@ function create_character(id, x, z, eulerY, type) {
         //camera.target = player.mesh;
 
         session_started = true;
+    }
+}
+
+function directionToEuler(direction) {
+    // WASD: 1 = up, 2 = left, 3 = down, 4 = right
+    switch (direction) {
+        case 1:
+            return Math.PI * (0 / 2);
+        case 2:
+            return -Math.PI * (1 / 2);
+        case 3:
+            return Math.PI * (2 / 2);
+        case 4:
+            return -Math.PI * (3 / 2);
     }
 }
 
@@ -136,18 +151,18 @@ websocket.onmessage = (event) => {
         // player orientations
         if (dataview.getUint8(0) === 1) {
             for (let i = 0; i < dataview.getUint16(1); i++) {
-                const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(3 + i * 16));
+                const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(3 + i * 13));
                 if (player_object) {
-                    player_object.x = dataview.getFloat32(7 + i * 16);
-                    player_object.z = dataview.getFloat32(11 + i * 16);
-                    player_object.eulerY = dataview.getFloat32(15 + i * 16);
+                    player_object.x = dataview.getFloat32(7 + i * 13);
+                    player_object.z = dataview.getFloat32(11 + i * 13);
+                    player_object.eulerY = directionToEuler(dataview.getUint8(15 + i * 13));
                 }
             }
         }
 
         // new player joins
         if (dataview.getUint8(0) === 4) {
-            create_character(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getFloat32(13), dataview.getInt8(17));
+            create_character(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getUint8(13), dataview.getInt8(14));
         }
 
         // new projectiles
@@ -228,17 +243,6 @@ document.onpointerup = function () {
 
 // client network update pulse
 setInterval(() => {
-    // player rotation
-    const pickResult = scene.pick(scene.pointerX, scene.pointerY);
-    if (pickResult.pickedPoint) {
-        const angle = Math.atan2(pickResult.pickedPoint.z - player.mesh.position.z, pickResult.pickedPoint.x - player.mesh.position.x);
-        const arraybuffer = new ArrayBuffer(5);
-        const dataview = new DataView(arraybuffer);
-        dataview.setUint8(0, 1);
-        dataview.setFloat32(1, angle);
-        websocket.send(dataview);
-    }
-
     // player wants to attack
     if (player.combat.attack) {
         const arraybuffer = new ArrayBuffer(1);
@@ -252,7 +256,7 @@ setInterval(() => {
         const arraybuffer = new ArrayBuffer(2);
         const dataview = new DataView(arraybuffer);
         dataview.setUint8(0, 3);
-        dataview.setUint8(1, 2);
+        dataview.setUint8(1, 1);
         websocket.send(dataview);
         player.movement.up = false;
     }
@@ -260,7 +264,7 @@ setInterval(() => {
         const arraybuffer = new ArrayBuffer(2);
         const dataview = new DataView(arraybuffer);
         dataview.setUint8(0, 3);
-        dataview.setUint8(1, 1);
+        dataview.setUint8(1, 2);
         websocket.send(dataview);
         player.movement.left = false;
     }
@@ -268,7 +272,7 @@ setInterval(() => {
         const arraybuffer = new ArrayBuffer(2);
         const dataview = new DataView(arraybuffer);
         dataview.setUint8(0, 3);
-        dataview.setUint8(1, 4);
+        dataview.setUint8(1, 3);
         websocket.send(dataview);
         player.movement.down = false;
     }
@@ -276,7 +280,7 @@ setInterval(() => {
         const arraybuffer = new ArrayBuffer(2);
         const dataview = new DataView(arraybuffer);
         dataview.setUint8(0, 3);
-        dataview.setUint8(1, 3);
+        dataview.setUint8(1, 4);
         websocket.send(dataview);
         player.movement.right = false;
     }
@@ -299,7 +303,7 @@ setInterval(() => {
                 player_object.mesh.position.x = lerp(player_object.mesh.position.x, player_object.x, deltaTime / lerpTime);
                 player_object.mesh.position.z = lerp(player_object.mesh.position.z, player_object.z, deltaTime / lerpTime);
 
-                player_object.mesh.rotation.y = lerp(player_object.mesh.rotation.y, player_object.eulerY, deltaTime / lerpTime);
+                player_object.mesh.rotation.y = player_object.eulerY; // do not lerp the direction
             });
         } else { // don't lerp
             player_list.forEach(player_object => {
