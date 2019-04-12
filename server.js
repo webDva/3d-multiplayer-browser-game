@@ -228,14 +228,7 @@ ws_server.on('connection', websocket => {
                             x: player.x,
                             z: player.z,
                         },
-                        direction: player.direction,
-                        physicsBox: {
-                            minX: player.x - 3 / 2,
-                            maxX: player.x + 3 / 2,
-
-                            minZ: player.z - 3 / 2,
-                            maxZ: player.z + 3 / 2
-                        },
+                        angle: player.angle,
                         speed: 3,
                         creationTime: Date.now(),
                         owner: player.id
@@ -255,13 +248,13 @@ ws_server.on('connection', websocket => {
                             player.angle = Math.PI * (0 / 2);
                             break;
                         case 2:
-                            player.angle = Math.PI * (1 / 2);
+                            player.angle = -Math.PI * (1 / 2);
                             break;
                         case 3:
                             player.angle = Math.PI * (2 / 2);
                             break;
                         case 4:
-                            player.angle = Math.PI * (3 / 2);
+                            player.angle = -Math.PI * (3 / 2);
                             break;
                     }
                     player.isMoving = true;
@@ -345,8 +338,8 @@ class Game {
     physicsLoop() {
         // projectile movement
         this.projectiles.forEach(projectile => {
-            projectile.position.x += Math.cos(projectile.forwardVector) * projectile.speed;
-            projectile.position.z += Math.sin(projectile.forwardVector) * projectile.speed;
+            projectile.position.x += Math.sin(projectile.angle) * projectile.speed;
+            projectile.position.z += Math.cos(projectile.angle) * projectile.speed;
         });
 
         // player and NPC movement
@@ -358,8 +351,8 @@ class Game {
                 return true;
             })
             .forEach(character => {
-                character.x += Math.cos(character.angle) * character.movement_speed;
-                character.z += Math.sin(character.angle) * character.movement_speed;
+                character.x += Math.sin(character.angle) * character.movement_speed;
+                character.z += Math.cos(character.angle) * character.movement_speed;
                 character.isMoving = false;
             });
     }
@@ -378,18 +371,15 @@ class Game {
                 if (projectile.owner !== character.id && character.isAlive === true) return true;
             })
                 .forEach(character => {
-                    if (isIntersecting(projectile.physicsBox, character.physicsBox)) {
-                        character.health--;
-                        this.projectiles.splice(this.projectiles.indexOf(projectile), 1);
-                        console.log('hit')
-                    }
+                    // no collision for now
+                    //this.projectiles.splice(this.projectiles.indexOf(projectile), 1);
                 });
         });
     }
 
     sendNetworkUpdates() {
         // send player and NPC orientations
-        let orientations = [];
+        const orientations = [];
         orientations.push({ type: 'Uint16', value: this.characters.length });
         this.characters.forEach(character => {
             orientations.push({ type: 'Uint32', value: character.id });
@@ -400,7 +390,7 @@ class Game {
         broadcast(createBinaryFrame(1, orientations));
 
         // send character healths
-        let healths = [];
+        const healths = [];
         healths.push({ type: 'Uint16', value: this.characters.length });
         this.characters.forEach(character => {
             healths.push({ type: 'Uint32', value: character.id });
@@ -408,24 +398,21 @@ class Game {
         });
         broadcast(createBinaryFrame(9, healths));
 
-        // new projectiles. may need to bulk send this too like orientations
-        this.networkUpdates.combat.newProjectiles.forEach(projectile => {
-            broadcast(createBinaryFrame(5, [
-                { type: 'Float32', value: projectile.position.x },
-                { type: 'Float32', value: projectile.position.z },
-                { type: 'Float32', value: projectile.forwardVector },
-                { type: 'Float32', value: projectile.speed },
-                { type: 'Uint32', value: projectile.owner }
-            ]));
-            this.networkUpdates.combat.newProjectiles.splice(this.networkUpdates.combat.newProjectiles.indexOf(projectile), 1);
-        });
+        // new projectiles
+        if (this.networkUpdates.combat.newProjectiles.length > 0) {
+            const projectiles = [];
+            projectiles.push({ type: 'Uint16', value: this.networkUpdates.combat.newProjectiles.length });
+            this.networkUpdates.combat.newProjectiles.forEach(projectile => {
+                projectiles.push({ type: 'Float32', value: projectile.position.x });
+                projectiles.push({ type: 'Float32', value: projectile.position.z });
+                projectiles.push({ type: 'Float32', value: projectile.angle });
+                projectiles.push({ type: 'Float32', value: projectile.speed });
+                projectiles.push({ type: 'Uint32', value: projectile.owner });
+                this.networkUpdates.combat.newProjectiles.splice(this.networkUpdates.combat.newProjectiles.indexOf(projectile), 1);
+            });
+            broadcast(createBinaryFrame(5, projectiles));
+        }
     }
-}
-
-function isIntersecting(physicsBoxA, physicsBoxB) {
-    return (physicsBoxA.minX <= physicsBoxB.maxX && physicsBoxA.maxX >= physicsBoxB.minX) &&
-        (physicsBoxA.minY <= physicsBoxB.maxY && physicsBoxA.maxY >= physicsBoxB.minY) &&
-        (physicsBoxA.minZ <= physicsBoxB.maxZ && physicsBoxA.maxZ >= physicsBoxB.minZ);
 }
 
 const game = new Game();

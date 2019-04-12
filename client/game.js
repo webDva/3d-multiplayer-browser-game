@@ -148,14 +148,16 @@ websocket.onmessage = (event) => {
 
         // new projectiles
         if (dataview.getUint8(0) === 5) {
-            const projectile = {
-                particleSystem: create_particles(dataview.getFloat32(1), dataview.getFloat32(5)),
-                forwardVector: dataview.getFloat32(9),
-                creationTime: Date.now(),
-                speed: dataview.getFloat32(13),
-                owner: dataview.getUint32(17)
-            };
-            projectile_list.push(projectile);
+            for (let i = 0; i < dataview.getUint16(1); i++) {
+                const projectile = {
+                    particleSystem: create_particles(dataview.getFloat32(3 + i * 20), dataview.getFloat32(7 + i * 20)),
+                    forwardVector: dataview.getFloat32(11 + i * 20),
+                    creationTime: Date.now(),
+                    speed: dataview.getFloat32(15 + i * 20),
+                    owner: dataview.getUint32(19 + i * 20)
+                };
+                projectile_list.push(projectile);
+            }
         }
 
         // player disconnect
@@ -205,18 +207,10 @@ document.addEventListener('keydown', function (event) {
     if (char === 'D') {
         player.movement = 4;
     }
-});
-
-document.onpointerdown = function () {
-    const pickResult = scene.pick(scene.pointerX, scene.pointerY);
-    if (pickResult.hit) {
+    if (char === '1') {
         player.combat.attack = true;
     }
-};
-
-document.onpointerup = function () {
-    player.combat.attack = false;
-};
+});
 
 // client network update pulse
 setInterval(() => {
@@ -226,6 +220,7 @@ setInterval(() => {
         const dataview = new DataView(arraybuffer);
         dataview.setUint8(0, 2);
         websocket.send(dataview);
+        player.combat.attack = false;
     }
 
     // send player movement requests
@@ -269,8 +264,8 @@ setInterval(() => {
 
         // projectile particle systems movement
         projectile_list.forEach(projectile => {
-            projectile.particleSystem.emitter.x += Math.cos(projectile.forwardVector) * projectile.speed;
-            projectile.particleSystem.emitter.z += Math.sin(projectile.forwardVector) * projectile.speed;
+            projectile.particleSystem.emitter.x += Math.sin(projectile.forwardVector) * projectile.speed;
+            projectile.particleSystem.emitter.z += Math.cos(projectile.forwardVector) * projectile.speed;
         });
     }
 
@@ -280,9 +275,9 @@ setInterval(() => {
 // mostly for game logic and animation stuff
 scene.registerBeforeRender(function () {
     if (session_started) {
-        camera.position.x = player.mesh.position.x - 25;
+        camera.position.x = player.mesh.position.x;
         camera.position.y = player.mesh.position.y + 25;
-        camera.position.z = player.mesh.position.z;
+        camera.position.z = player.mesh.position.z - 25;
 
         // remove expired projectiles on the client side
         projectile_list.forEach(projectile => {
