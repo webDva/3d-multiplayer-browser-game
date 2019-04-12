@@ -48,38 +48,48 @@ let session_started = false;
 const projectile_list = [];
 
 function create_character(id, x, z, angle, type) {
-    const mesh = BABYLON.MeshBuilder.CreateCylinder('', { diameterTop: 0, tessellation: 32 }, scene);
-    mesh.rotation.x = Math.PI * (1 / 2);
-    mesh.material = new BABYLON.StandardMaterial('', scene);
-    mesh.material.diffuseColor = BABYLON.Color3.Blue();
+    BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'circle2.babylon', scene).then(function (imported) {
+        const mesh = imported.meshes[0];
+        mesh.material = new BABYLON.StandardMaterial('', scene);
+        mesh.material.diffuseColor = BABYLON.Color3.Blue();
 
-    if (type === 0) { // if an NPC
-        mesh.material.diffuseColor = BABYLON.Color3.Red();
-    }
+        if (type === 0) { // if an NPC
+            mesh.material.diffuseColor = BABYLON.Color3.Red();
+        }
 
-    mesh.KGAME_TYPE = 1; // KGAME_TYPE 1 means that it is a kawaii game mesh of type 1
-    const player_struct = {
-        id: id,
-        x: x,
-        z: z,
-        mesh: mesh,
-        eulerY: angle,
-        health: 0,
-        type: type
-    };
-    player_list.push(player_struct);
-    mesh.position.x = x;
-    mesh.position.z = z;
-    mesh.rotation.y = angle;
+        // animation
+        mesh.skeleton.animationPropertiesOverride = new BABYLON.AnimationPropertiesOverride();
+        mesh.skeleton.animationPropertiesOverride.enableBlending = true;
+        mesh.skeleton.animationPropertiesOverride.blendingSpeed = 0.2;
+        mesh.skeleton.animationPropertiesOverride.loopMode = 1;
+        mesh.idleRange = mesh.skeleton.getAnimationRange('IdleAnimation');
+        mesh.walkRange = mesh.skeleton.getAnimationRange('Walk');
+        mesh.idleRange.animation = scene.beginAnimation(mesh.skeleton, mesh.idleRange.from, mesh.idleRange.to, true, 0.5);        
 
-    if (player.id === id) {
-        player.mesh = mesh;
-        player.struct = player_struct;
-        camera.lockedTarget = player.mesh;
-        //camera.target = player.mesh;
+        mesh.KGAME_TYPE = 1; // KGAME_TYPE 1 means that it is a kawaii game mesh of type 1
+        const player_struct = {
+            id: id,
+            x: x,
+            z: z,
+            mesh: mesh,
+            eulerY: angle,
+            health: 0,
+            type: type
+        };
+        player_list.push(player_struct);
+        mesh.position.x = x;
+        mesh.position.z = z;
+        mesh.rotation.y = angle;
 
-        session_started = true;
-    }
+        if (player.id === id) {
+            player.mesh = mesh;
+            player.struct = player_struct;
+            camera.lockedTarget = player.mesh;
+            //camera.target = player.mesh;
+
+            session_started = true;
+        }
+    });
 }
 
 // particle system handling subsystem
