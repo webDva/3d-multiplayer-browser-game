@@ -196,7 +196,7 @@ ws_server.on('connection', websocket => {
                     { type: 'Uint32', value: websocket.player.id },
                     { type: 'Float32', value: websocket.player.x },
                     { type: 'Float32', value: websocket.player.z },
-                    { type: 'Uint8', value: websocket.player.direction },
+                    { type: 'Float32', value: websocket.player.angle },
                     { type: 'Int8', value: 1 } // player type and not an NPC type
                 ]), websocket);
             }
@@ -209,7 +209,7 @@ ws_server.on('connection', websocket => {
                         { type: 'Uint32', value: character.id },
                         { type: 'Float32', value: character.x },
                         { type: 'Float32', value: character.z },
-                        { type: 'Uint8', value: character.direction },
+                        { type: 'Float32', value: character.angle },
                         { type: 'Int8', value: character.type ? 1 : 0 } // 1 if is a player and 0 if an NPC
                     ]), websocket);
                 });
@@ -249,8 +249,22 @@ ws_server.on('connection', websocket => {
             if (client_dataview.getUint8(0) === 3) {
                 const player = websocket.player;
 
-                if (player.isAlive) { // WASD: 1 = up, 2 = left, 3 = down, 4 = right
-                    player.isMoving = client_dataview.getUint8(1);
+                if (player.isAlive) {
+                    switch (client_dataview.getUint8(1)) { // WASD: 1 = up, 2 = left, 3 = down, 4 = right
+                        case 1:
+                            player.angle = Math.PI * (0 / 2);
+                            break;
+                        case 2:
+                            player.angle = Math.PI * (1 / 2);
+                            break;
+                        case 3:
+                            player.angle = Math.PI * (2 / 2);
+                            break;
+                        case 4:
+                            player.angle = Math.PI * (3 / 2);
+                            break;
+                    }
+                    player.isMoving = true;
                 }
             }
         }
@@ -294,10 +308,10 @@ class Game {
             // initial orientation
             x: Math.random() * this.mapSize,
             z: Math.random() * this.mapSize,
-            direction: 3, // WASD: 1 = up, 2 = left, 3 = down, 4 = right
+            angle: Math.PI * (2 / 2), // facing south. it doesn't have to be zero
 
             movement_speed: config.player.defaultMovementSpeed,
-            isMoving: false, // false means not moving, 1 = up, 2 = left, 3 = down, 4 = right
+            isMoving: false,
 
             // collision
             radius: config.player.radius,
@@ -333,13 +347,6 @@ class Game {
         this.projectiles.forEach(projectile => {
             projectile.position.x += Math.cos(projectile.forwardVector) * projectile.speed;
             projectile.position.z += Math.sin(projectile.forwardVector) * projectile.speed;
-
-            // move the projectile's physics box as well
-            projectile.physicsBox.minX = projectile.position.x - 3 / 2;
-            projectile.physicsBox.maxX = projectile.position.x + 3 / 2;
-
-            projectile.physicsBox.minZ = projectile.position.z - 3 / 2;
-            projectile.physicsBox.maxZ = projectile.position.z + 3 / 2;
         });
 
         // player and NPC movement
@@ -351,16 +358,9 @@ class Game {
                 return true;
             })
             .forEach(character => {
-                moveCharacter(character, character.isMoving);
-
-                character.physicsBox.minX = character.x - 3 / 2;
-                character.physicsBox.maxX = character.x + 3 / 2;
-
-                character.physicsBox.minY = character.y - 3 / 2;
-                character.physicsBox.maxY = character.y + 3 / 2;
-
-                character.physicsBox.minZ = character.z - 3 / 2;
-                character.physicsBox.maxZ = character.z + 3 / 2;
+                character.x += Math.cos(character.angle) * character.movement_speed;
+                character.z += Math.sin(character.angle) * character.movement_speed;
+                character.isMoving = false;
             });
     }
 
@@ -395,7 +395,7 @@ class Game {
             orientations.push({ type: 'Uint32', value: character.id });
             orientations.push({ type: 'Float32', value: character.x });
             orientations.push({ type: 'Float32', value: character.z });
-            orientations.push({ type: 'Uint8', value: character.direction });
+            orientations.push({ type: 'Float32', value: character.angle });
         });
         broadcast(createBinaryFrame(1, orientations));
 
@@ -420,23 +420,6 @@ class Game {
             this.networkUpdates.combat.newProjectiles.splice(this.networkUpdates.combat.newProjectiles.indexOf(projectile), 1);
         });
     }
-}
-
-function moveCharacter(character, direction) {
-    if (direction === 1) {
-        character.z += character.movement_speed;
-        character.direction = 1;
-    } else if (direction === 2) {
-        character.x -= character.movement_speed;
-        character.direction = 2;
-    } else if (direction === 3) {
-        character.z -= character.movement_speed;
-        character.direction = 3;
-    } else if (direction === 4) {
-        character.x += character.movement_speed;
-        character.direction = 4;
-    }
-    character.isMoving = false;
 }
 
 function isIntersecting(physicsBoxA, physicsBoxB) {

@@ -52,7 +52,7 @@ const player_list = [];
 let session_started = false;
 const projectile_list = [];
 
-function create_character(id, x, z, direction, type) {
+function create_character(id, x, z, angle, type) {
     const mesh = BABYLON.MeshBuilder.CreateCylinder('', { diameterTop: 0, tessellation: 32 }, scene);
     mesh.rotation.x = Math.PI * (1 / 2);
     mesh.material = new BABYLON.StandardMaterial('', scene);
@@ -68,14 +68,14 @@ function create_character(id, x, z, direction, type) {
         x: x,
         z: z,
         mesh: mesh,
-        eulerY: directionToEuler(direction),
+        eulerY: angle,
         health: 0,
         type: type
     };
     player_list.push(player_struct);
     mesh.position.x = x;
     mesh.position.z = z;
-    mesh.rotation.y = player_struct.eulerY;
+    mesh.rotation.y = angle;
 
     if (player.id === id) {
         player.mesh = mesh;
@@ -84,20 +84,6 @@ function create_character(id, x, z, direction, type) {
         //camera.target = player.mesh;
 
         session_started = true;
-    }
-}
-
-function directionToEuler(direction) {
-    // WASD: 1 = up, 2 = left, 3 = down, 4 = right
-    switch (direction) {
-        case 1:
-            return Math.PI * (0 / 2);
-        case 2:
-            return -Math.PI * (1 / 2);
-        case 3:
-            return Math.PI * (2 / 2);
-        case 4:
-            return -Math.PI * (3 / 2);
     }
 }
 
@@ -151,18 +137,18 @@ websocket.onmessage = (event) => {
         // player orientations
         if (dataview.getUint8(0) === 1) {
             for (let i = 0; i < dataview.getUint16(1); i++) {
-                const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(3 + i * 13));
+                const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(3 + i * 16));
                 if (player_object) {
-                    player_object.x = dataview.getFloat32(7 + i * 13);
-                    player_object.z = dataview.getFloat32(11 + i * 13);
-                    player_object.eulerY = directionToEuler(dataview.getUint8(15 + i * 13));
+                    player_object.x = dataview.getFloat32(7 + i * 16);
+                    player_object.z = dataview.getFloat32(11 + i * 16);
+                    player_object.eulerY = dataview.getFloat32(15 + i * 16);
                 }
             }
         }
 
         // new player joins
         if (dataview.getUint8(0) === 4) {
-            create_character(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getUint8(13), dataview.getInt8(14));
+            create_character(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getFloat32(13), dataview.getInt8(17));
         }
 
         // new projectiles
@@ -214,19 +200,15 @@ document.addEventListener('keydown', function (event) {
     const char = String.fromCharCode(event.keyCode);
     if (char === 'W') {
         player.movement.up = true;
-        player.mesh.position.z += 0.5;
     }
     if (char === 'A') {
         player.movement.left = true;
-        player.mesh.position.x -= 0.5;
     }
     if (char === 'S') {
         player.movement.down = true;
-        player.mesh.position.z -= 0.5;
     }
     if (char === 'D') {
         player.movement.right = true;
-        player.mesh.position.x += 0.5;
     }
 });
 
@@ -327,9 +309,9 @@ setInterval(() => {
 // mostly for game logic and animation stuff
 scene.registerBeforeRender(function () {
     if (session_started) {
-        camera.position.x = player.mesh.position.x;
+        camera.position.x = player.mesh.position.x - 25;
         camera.position.y = player.mesh.position.y + 25;
-        camera.position.z = player.mesh.position.z - 25;
+        camera.position.z = player.mesh.position.z;
 
         // remove expired projectiles on the client side
         projectile_list.forEach(projectile => {
