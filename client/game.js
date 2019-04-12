@@ -37,12 +37,7 @@ const player = {
     mesh: null,
     struct: null,
 
-    movement: {
-        left: false,
-        up: false,
-        right: false,
-        down: false,
-    },
+    movement: 0,
 
     combat: {
         attack: false
@@ -199,16 +194,16 @@ websocket.onopen = () => {
 document.addEventListener('keydown', function (event) {
     const char = String.fromCharCode(event.keyCode);
     if (char === 'W') {
-        player.movement.up = true;
+        player.movement = 1;
     }
     if (char === 'A') {
-        player.movement.left = true;
+        player.movement = 2;
     }
     if (char === 'S') {
-        player.movement.down = true;
+        player.movement = 3;
     }
     if (char === 'D') {
-        player.movement.right = true;
+        player.movement = 4;
     }
 });
 
@@ -234,37 +229,13 @@ setInterval(() => {
     }
 
     // send player movement requests
-    if (player.movement.up) {
+    if (player.movement) {
         const arraybuffer = new ArrayBuffer(2);
         const dataview = new DataView(arraybuffer);
         dataview.setUint8(0, 3);
-        dataview.setUint8(1, 1);
+        dataview.setUint8(1, player.movement);
         websocket.send(dataview);
-        player.movement.up = false;
-    }
-    if (player.movement.left) {
-        const arraybuffer = new ArrayBuffer(2);
-        const dataview = new DataView(arraybuffer);
-        dataview.setUint8(0, 3);
-        dataview.setUint8(1, 2);
-        websocket.send(dataview);
-        player.movement.left = false;
-    }
-    if (player.movement.down) {
-        const arraybuffer = new ArrayBuffer(2);
-        const dataview = new DataView(arraybuffer);
-        dataview.setUint8(0, 3);
-        dataview.setUint8(1, 3);
-        websocket.send(dataview);
-        player.movement.down = false;
-    }
-    if (player.movement.right) {
-        const arraybuffer = new ArrayBuffer(2);
-        const dataview = new DataView(arraybuffer);
-        dataview.setUint8(0, 3);
-        dataview.setUint8(1, 4);
-        websocket.send(dataview);
-        player.movement.right = false;
+        player.movement = 0;
     }
 }, 1000 / 20);
 
