@@ -64,7 +64,7 @@ function create_character(id, x, z, angle, type) {
         mesh.skeleton.animationPropertiesOverride.loopMode = 1;
         mesh.idleRange = mesh.skeleton.getAnimationRange('IdleAnimation');
         mesh.walkRange = mesh.skeleton.getAnimationRange('Walk');
-        mesh.idleRange.animation = scene.beginAnimation(mesh.skeleton, mesh.idleRange.from, mesh.idleRange.to, true, 0.5);        
+        mesh.idleRange.animation = scene.beginAnimation(mesh.skeleton, mesh.idleRange.from, mesh.idleRange.to, true, 0.5);
 
         mesh.KGAME_TYPE = 1; // KGAME_TYPE 1 means that it is a kawaii game mesh of type 1
         const player_struct = {
@@ -80,6 +80,10 @@ function create_character(id, x, z, angle, type) {
         mesh.position.x = x;
         mesh.position.z = z;
         mesh.rotation.y = angle;
+
+        // for walk animation
+        mesh.previousX = x;
+        mesh.previousZ = z;
 
         if (player.id === id) {
             player.mesh = mesh;
@@ -294,6 +298,36 @@ scene.registerBeforeRender(function () {
             if (Date.now() - projectile.creationTime > 10000) {
                 projectile.particleSystem.stop();
                 projectile_list.splice(projectile_list.indexOf(projectile), 1);
+            }
+        });
+
+        // movement animations
+        player_list.forEach(player_object => {
+            if (player_object.mesh.previousX != player_object.mesh.position.x || player_object.mesh.previousZ != player_object.mesh.position.z) {
+                if (!player_object.mesh.walkRange.isRunning) {
+                    player_object.mesh.walkRange.isRunning = true;
+                    player_object.mesh.idleRange.isRunning = false;
+                    player_object.mesh.idleRange.animation.stop();
+                    player_object.mesh.walkRange.animation = scene.beginAnimation(player_object.mesh.skeleton, player_object.mesh.walkRange.from, player_object.mesh.walkRange.to, true, 1);
+                }
+            } else {
+                if (!player_object.mesh.idleRange.isRunning) {
+                    player_object.mesh.idleRange.isRunning = true;
+                    player_object.mesh.walkRange.isRunning = false;
+                    if (player_object.mesh.walkRange.animation)
+                        player_object.mesh.walkRange.animation.stop();
+                    player_object.mesh.idleRange.animation = scene.beginAnimation(player_object.mesh.skeleton, player_object.mesh.idleRange.from, player_object.mesh.idleRange.to, true, 1);
+                }
+            }
+
+            const deltaTime = engine.getDeltaTime();
+            const lerpFactor = 40;
+            if (deltaTime <= lerpFactor) {
+                player_object.mesh.previousX = lerp(player_object.mesh.previousX, player_object.mesh.position.x, deltaTime / lerpFactor);
+                player_object.mesh.previousZ = lerp(player_object.mesh.previousZ, player_object.mesh.position.z, deltaTime / lerpFactor);
+            } else {
+                player_object.mesh.previousX = player_object.mesh.position.x;
+                player_object.mesh.previousZ = player_object.mesh.position.z;
             }
         });
     }
