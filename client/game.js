@@ -14,7 +14,11 @@ scene.clearColor = new BABYLON.Color3(1, 1, 1);
 const camera = new BABYLON.FollowCamera('camera', new BABYLON.Vector3(0, 0, 0), scene);
 //const camera = new BABYLON.UniversalCamera('camera', new BABYLON.Vector3(0, 0, 0), scene);
 //const camera = new BABYLON.ArcRotateCamera("Camera", 1, 1, 4, new BABYLON.Vector3(-10, 10, 20), scene);
-camera.attachControl(canvas, false);
+camera.attachControl(canvas);
+
+// inventory camera
+const inventoryCamera = new BABYLON.ArcRotateCamera("InventoryCamera", 1, 1, 4, new BABYLON.Vector3(-10, 10, 20), scene);
+inventoryCamera.attachControl(canvas);
 
 // ground mesh
 const groundSize = 100;
@@ -89,7 +93,7 @@ function create_character(id, x, z, angle, type) {
             player.mesh = mesh;
             player.struct = player_struct;
             camera.lockedTarget = player.mesh;
-            //camera.target = player.mesh;
+            inventoryCamera.target = player.mesh;
 
             session_started = true;
         }
@@ -227,6 +231,15 @@ document.addEventListener('keydown', function (event) {
     // combat attacks/spells
     if (char === '1') {
         player.combat.attack = true;
+    }
+
+    // "I" for inventory
+    if (char === 'I') {
+        if (scene.activeCamera === camera) {
+            scene.activeCamera = inventoryCamera;
+        } else {
+            scene.activeCamera = camera;
+        }
     }
 });
 
