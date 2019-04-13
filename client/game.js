@@ -209,18 +209,22 @@ websocket.onopen = () => {
 // movement controls
 document.addEventListener('keydown', function (event) {
     const char = String.fromCharCode(event.keyCode);
-    if (char === 'W') {
+
+    // arrow keys
+    if (event.keyCode === 38) {
         player.movement = 1;
     }
-    if (char === 'A') {
+    if (event.keyCode === 37) {
         player.movement = 2;
     }
-    if (char === 'S') {
+    if (event.keyCode === 40) {
         player.movement = 3;
     }
-    if (char === 'D') {
+    if (event.keyCode === 39) {
         player.movement = 4;
     }
+
+    // combat attacks/spells
     if (char === '1') {
         player.combat.attack = true;
     }
