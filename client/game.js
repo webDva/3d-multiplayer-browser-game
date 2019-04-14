@@ -127,7 +127,7 @@ function create_particles(xPosition, zPosition) {
 }
 
 // aggro icon sprite manager
-const aggroIconSpriteManager = new BABYLON.SpriteManager('aggroSpriteManager', './assets/aggro_icon.png', 100, { width: 32, height: 64 }, scene);
+const aggroIconSpriteManager = new BABYLON.SpriteManager('aggroSpriteManager', './assets/aggro_icon.png', 100, { width: 64, height: 64 }, scene);
 
 // configure WebSocket client
 
@@ -167,11 +167,10 @@ websocket.onmessage = (event) => {
             const mobID = dataview.getUint32(1);
             const mobObject = player_list.find(player_object => player_object.id === mobID);
             const aggroIcon = new BABYLON.Sprite('aggroIcon', aggroIconSpriteManager);
-            aggroIcon.size = 2;
             aggroIcon.position = new BABYLON.Vector3(mobObject.mesh.position.x, 5, mobObject.mesh.position.z);
             setTimeout(function () {
                 aggroIcon.dispose();
-            }, 2000);
+            }, 1000);
         }
 
         // new player joins
