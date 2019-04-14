@@ -210,7 +210,7 @@ ws_server.on('connection', websocket => {
                         { type: 'Float32', value: character.x },
                         { type: 'Float32', value: character.z },
                         { type: 'Float32', value: character.angle },
-                        { type: 'Int8', value: character.type ? 1 : 0 } // 1 if is a player and 0 if an NPC
+                        { type: 'Int8', value: character.isHumanPlayer ? 1 : 0 } // 1 if is a player and 0 if an NPC
                     ]), websocket);
                 });
             }
@@ -291,12 +291,14 @@ class Game {
         // used IDs
         this.usedCharacterIDs = [];
         this.usedCollectibleIDs = [];
+
+        this.addCharacter(false);
     }
 
     addCharacter(isHumanPlayer = true) {
         const character = {
             id: randomUint32ID(this.characters, this.usedCharacterIDs),
-            type: isHumanPlayer, // true for player and false for NPC. TODO: create additional logic for NPCs inside this function
+            isHumanPlayer: isHumanPlayer, // true for player and false for NPC. TODO: create additional logic for NPCs inside this function
 
             // initial orientation
             x: Math.random() * this.mapSize,
@@ -327,9 +329,12 @@ class Game {
             maxZ: character.z + 3 / 2
         };
 
-        // combat: {
-        //     aggro: [] // a list of player-aggro pairs
-        // }        
+        // NPC
+        if (!isHumanPlayer) {
+            character.aggroTable = []; // a list of player-aggro pairs (.player and .aggro object names)
+            character.aggroRadius = 10;
+            character.movement_speed = 0.1;
+        }
 
         this.characters.push(character);
         return character;
@@ -375,6 +380,72 @@ class Game {
                     //this.projectiles.splice(this.projectiles.indexOf(projectile), 1);
                 });
         });
+
+        // NPC aggro initiation/human player detection by NPC
+        this.characters.filter(character => {
+            return (!character.isHumanPlayer && character.isAlive);
+        })
+            .forEach(npc => {
+                if (npc.aggroTable.length === 0) { // if not aggroed already
+                    this.characters.filter(character => {
+                        return (character.isHumanPlayer && character.isAlive);
+                    })
+                        .forEach(humanPlayer => {
+                            if (Math.sqrt(Math.pow(npc.x - humanPlayer.x, 2) + Math.pow(npc.z - humanPlayer.z, 2)) <= npc.aggroRadius) {
+                                npc.aggroTable.push({ player: humanPlayer, aggro: 10 });
+                            }
+                        });
+                }
+            });
+
+        // NPC chases a target
+        this.characters.filter(character => {
+            return (!character.isHumanPlayer && character.isAlive);
+        })
+            .filter(npc => {
+                // remove players that are dead or don't exist anymore
+                npc.aggroTable.forEach(aggroPair => {
+                    if (!this.characters.includes(aggroPair.player) || !aggroPair.player.isAlive) {
+                        npc.aggroTable.splice(npc.aggroTable.indexOf(aggroPair), 1);
+                    }
+                });
+
+                return npc.aggroTable.length !== 0;
+            })
+            .forEach(npc => {
+                // determine who has the highest aggro
+                let maximumAggro = 0;
+                let target;
+                npc.aggroTable.forEach(aggroPair => {
+                    if (aggroPair.aggro > maximumAggro) {
+                        maximumAggro = aggroPair.aggro;
+                        target = aggroPair.player;
+                    }
+                });
+
+                // chase the target with the highest aggro
+                const distanceThreshold = 3; // how far from the target. different from movement distance threshold
+                if (Math.abs(target.x - npc.x) > distanceThreshold || Math.abs(target.z - npc.z) > distanceThreshold) {
+                    const movementDistanceThreshold = 1; // how many "pixels" from the axis
+                    if (Math.abs(target.x - npc.x) > movementDistanceThreshold) {
+                        if (npc.x - target.x > 0) {
+                            npc.angle = -Math.PI * (1 / 2);
+                            npc.isMoving = true;
+                        } else {
+                            npc.angle = -Math.PI * (3 / 2);
+                            npc.isMoving = true;
+                        }
+                    } else if (Math.abs(target.z - npc.z) > movementDistanceThreshold) {
+                        if (npc.z - target.z > 0) {
+                            npc.angle = Math.PI * (2 / 2);
+                            npc.isMoving = true;
+                        } else {
+                            npc.angle = Math.PI * (0 / 2);
+                            npc.isMoving = true;
+                        }
+                    }
+                }
+            });
     }
 
     sendNetworkUpdates() {
