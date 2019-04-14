@@ -393,6 +393,7 @@ class Game {
                         .forEach(humanPlayer => {
                             if (Math.sqrt(Math.pow(npc.x - humanPlayer.x, 2) + Math.pow(npc.z - humanPlayer.z, 2)) <= npc.aggroRadius) {
                                 npc.aggroTable.push({ player: humanPlayer, aggro: 10 });
+                                transmitPlayer(createBinaryFrame(2, [{ type: 'Uint32', value: npc.id }]), humanPlayer);
                             }
                         });
                 }
