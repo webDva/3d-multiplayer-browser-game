@@ -24,7 +24,6 @@ inventoryCamera.attachControl(canvas);
 const groundSize = 100;
 const ground = BABYLON.Mesh.CreateGround("ground", groundSize, groundSize, 1, scene);
 ground.setPivotMatrix(BABYLON.Matrix.Translation(groundSize / 2, 0, groundSize / 2), false);
-ground.position.y = -1;
 ground.material = new BABYLON.GridMaterial('groundMaterial', scene);
 ground.material.mainColor = new BABYLON.Color3(0.75, 0.75, 0.75);
 ground.material.lineColor = new BABYLON.Color3(0.5, 0.5, 0.5);
@@ -60,6 +59,14 @@ function create_character(id, x, z, angle, type) {
         if (type === 0) { // if an NPC
             mesh.material.diffuseColor = BABYLON.Color3.Red();
         }
+
+        // add weapon and attach it
+        BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'staff.babylon', scene).then(function (meshes) {
+            const weaponMesh = meshes.meshes[0];
+            weaponMesh.attachToBone(mesh.skeleton.bones[mesh.skeleton.getBoneIndexByName('RightHand')], mesh);
+            weaponMesh.rotation.x = Math.PI * (-1 / 2);
+            weaponMesh.position.y += 0.5;
+        });
 
         // animation
         mesh.skeleton.animationPropertiesOverride = new BABYLON.AnimationPropertiesOverride();
