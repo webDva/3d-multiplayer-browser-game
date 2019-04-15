@@ -29,12 +29,14 @@ if (env.production) {
 
     minify({
         compressor: htmlMinifier,
+        sync: true,
         input: './client/index.html',
         output: './minified/index.html'
     });
 
     minify({
         compressor: cleanCSS,
+        sync: true,
         input: './client/styles/style.css',
         output: './minified/style.css'
     });
