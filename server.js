@@ -292,7 +292,9 @@ class Game {
         this.usedCharacterIDs = [];
         this.usedCollectibleIDs = [];
 
-        this.addCharacter(false);
+        for (let i = 0; i < 3; i++) {
+            this.addCharacter(false);
+        }
     }
 
     addCharacter(isHumanPlayer = true) {
