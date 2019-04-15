@@ -241,24 +241,7 @@ ws_server.on('connection', websocket => {
             // player wants to move
             if (client_dataview.getUint8(0) === 3) {
                 const player = websocket.player;
-
-                if (player.isAlive) {
-                    switch (client_dataview.getUint8(1)) { // WASD: 1 = up, 2 = left, 3 = down, 4 = right
-                        case 1:
-                            player.angle = Math.PI * (0 / 2);
-                            break;
-                        case 2:
-                            player.angle = -Math.PI * (1 / 2);
-                            break;
-                        case 3:
-                            player.angle = Math.PI * (2 / 2);
-                            break;
-                        case 4:
-                            player.angle = -Math.PI * (3 / 2);
-                            break;
-                    }
-                    player.isMoving = true;
-                }
+                player.move(client_dataview.getUint8(1));
             }
         }
     });
@@ -298,48 +281,7 @@ class Game {
     }
 
     addCharacter(isHumanPlayer = true) {
-        const character = {
-            id: randomUint32ID(this.characters, this.usedCharacterIDs),
-            isHumanPlayer: isHumanPlayer, // true for player and false for NPC. TODO: create additional logic for NPCs inside this function
-
-            // initial orientation
-            x: Math.random() * this.mapSize,
-            z: Math.random() * this.mapSize,
-            angle: Math.PI * (2 / 2), // facing south. it doesn't have to be zero
-
-            movement_speed: config.player.defaultMovementSpeed,
-            isMoving: false,
-
-            // collision
-            radius: config.player.radius,
-
-            throttleSetting: 0,
-
-            health: 100, // has to be a signed 32-bit integer for negative health values
-
-            isAlive: true,
-            deathTime: 0,
-
-            combat: {} // cooldowns, etc.
-        };
-
-        character.physicsBox = {
-            minX: character.x - 3 / 2,
-            maxX: character.x + 3 / 2,
-
-            minZ: character.z - 3 / 2,
-            maxZ: character.z + 3 / 2
-        };
-
-        // NPC
-        if (!isHumanPlayer) {
-            character.aggroTable = []; // a list of player-aggro pairs (.player and .aggro object names)
-            character.aggroRadius = 10;
-            character.movement_speed = 0.1;
-        }
-
-        this.characters.push(character);
-        return character;
+        return new Character(this, isHumanPlayer);
     }
 
     physicsLoop() {
@@ -418,7 +360,7 @@ class Game {
             .forEach(npc => {
                 // determine who has the highest aggro
                 let maximumAggro = 0;
-                let target;
+                let target = npc.aggroTable[0].player; // would need to deal with players who decreased their enemity
                 npc.aggroTable.forEach(aggroPair => {
                     if (aggroPair.aggro > maximumAggro) {
                         maximumAggro = aggroPair.aggro;
@@ -427,27 +369,7 @@ class Game {
                 });
 
                 // chase the target with the highest aggro
-                const distanceThreshold = 3; // how far from the target. different from movement distance threshold
-                if (Math.abs(target.x - npc.x) > distanceThreshold || Math.abs(target.z - npc.z) > distanceThreshold) {
-                    const movementDistanceThreshold = 1; // how many "pixels" from the axis
-                    if (Math.abs(target.x - npc.x) > movementDistanceThreshold) {
-                        if (npc.x - target.x > 0) {
-                            npc.angle = -Math.PI * (1 / 2);
-                            npc.isMoving = true;
-                        } else {
-                            npc.angle = -Math.PI * (3 / 2);
-                            npc.isMoving = true;
-                        }
-                    } else if (Math.abs(target.z - npc.z) > movementDistanceThreshold) {
-                        if (npc.z - target.z > 0) {
-                            npc.angle = Math.PI * (2 / 2);
-                            npc.isMoving = true;
-                        } else {
-                            npc.angle = Math.PI * (0 / 2);
-                            npc.isMoving = true;
-                        }
-                    }
-                }
+                npc.moveTo(target.x, target.z);
             });
     }
 
@@ -485,6 +407,89 @@ class Game {
                 this.networkUpdates.combat.newProjectiles.splice(this.networkUpdates.combat.newProjectiles.indexOf(projectile), 1);
             });
             broadcast(createBinaryFrame(5, projectiles));
+        }
+    }
+}
+
+class Character {
+    constructor(game, isHumanPlayer = true) {
+        this.id = randomUint32ID(game.characters, game.usedCharacterIDs);
+        this.isHumanPlayer = isHumanPlayer; // true for player and false for NPC
+
+        // initial orientation
+        this.x = Math.random() * game.mapSize;
+        this.z = Math.random() * game.mapSize;
+        this.angle = Math.PI * (2 / 2); // facing south. it doesn't have to be zero
+
+        this.movement_speed = config.player.defaultMovementSpeed;
+        this.isMoving = false;
+
+        // collision
+        this.box = null; // empty for now
+
+        this.health = 100; // has to be a signed 32-bit integer for negative health values
+
+        this.isAlive = true;
+        this.deathTime = 0;
+
+        this.combat = {}; // cooldowns, etc.   
+
+        if (!isHumanPlayer) {
+            this.aggroTable = []; // a list of player-aggro pairs (.player and .aggro object names)
+            this.aggroRadius = 10;
+            this.movement_speed = 0.1;
+        }
+
+        game.characters.push(this);
+    }
+
+    /**
+     * moves up, left, down, or right
+     * @param {Number} direction 1 = up, 2 = left, 3 = down, 4 = right
+     */
+    move(direction) {
+        if (this.isAlive) {
+            switch (direction) {
+                case 1:
+                    this.angle = Math.PI * (0 / 2);
+                    break;
+                case 2:
+                    this.angle = -Math.PI * (1 / 2);
+                    break;
+                case 3:
+                    this.angle = Math.PI * (2 / 2);
+                    break;
+                case 4:
+                    this.angle = -Math.PI * (3 / 2);
+                    break;
+            }
+
+            this.isMoving = true;
+        }
+    }
+
+    /**
+     * moves to a specific location. will need to add collision checking that accounts for collision box sizes on collision
+     * @param {*} x 
+     * @param {*} z 
+     * @param {*} distanceThreshold how far from the target
+     * @param {*} movementDistanceThreshold how many "pixels" from an axis
+     */
+    moveTo(x, z, distanceThreshold = 3, movementDistanceThreshold = 1) {
+        if (Math.abs(x - this.x) > distanceThreshold || Math.abs(z - this.z) > distanceThreshold) {
+            if (Math.abs(x - this.x) > movementDistanceThreshold) {
+                if (this.x - x > 0) {
+                    this.move(2);
+                } else {
+                    this.move(4);
+                }
+            } else if (Math.abs(z - this.z) > movementDistanceThreshold) {
+                if (this.z - z > 0) {
+                    this.move(3);
+                } else {
+                    this.move(1);
+                }
+            }
         }
     }
 }
