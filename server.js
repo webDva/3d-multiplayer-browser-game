@@ -51,15 +51,24 @@ if (env.production) {
 }
 
 const config = {
-    "PORT": 3000,
-    "networkUpdatePulseRate": 10,
-    "physicsTickRate": 30,
-    "player": {
-        "defaultMovementSpeed": 1,
-        "radius": 3
+    PORT: 3000,
+    networkUpdatePulseRate: 10,
+    physicsTickRate: 30,
+    character: {
+        defaultMovementSpeed: 1,
+        collisionBoxSize: 3
     },
-    "mapSize": 100,
-    "pingTime": 40
+    mapSize: 100,
+    pingTime: 40
+};
+
+const CONSTANTS = {
+    DIRECTIONS: {
+        UP: Math.PI * (0 / 2),
+        LEFT: -Math.PI * (1 / 2),
+        DOWN: Math.PI * (2 / 2),
+        RIGHT: -Math.PI * (3 / 2)
+    }
 };
 
 app.use(express.static(__dirname + '/client'));
@@ -181,7 +190,7 @@ function createBinaryFrame(id, segments, id_size = true) { // segments is a list
 ws_server.on('connection', websocket => {
     websocket.isAlive = true; // create this property for the sake of implementing ping-pong heartbeats
 
-    websocket.player = game.addCharacter();
+    websocket.player = game.createHumanPlayer();
 
     websocket.on('message', message => {
         if (typeof message === 'string') {
@@ -268,20 +277,23 @@ class Game {
         this.combat = {
             attacks: []
         };
-        this.npcs = [];
-        //const npc = this.addNPC();
+        this.npcs = []; // can create a retrieve NPCs Game class method
         this.projectiles = [];
         // used IDs
         this.usedCharacterIDs = [];
         this.usedCollectibleIDs = [];
 
         for (let i = 0; i < 3; i++) {
-            this.addCharacter(false);
+            this.createNPC();
         }
     }
 
-    addCharacter(isHumanPlayer = true) {
-        return new Character(this, isHumanPlayer);
+    createHumanPlayer() {
+        return new Player(this);
+    }
+
+    createNPC() {
+        return new NPC(this);
     }
 
     physicsLoop() {
@@ -412,16 +424,22 @@ class Game {
 }
 
 class Character {
-    constructor(game, isHumanPlayer = true) {
+    /**
+     * Base class for characters, human and NPC.
+     * @param {Game} game Game instance
+     * @param {boolean} isHumanPlayer true for human player and false for NPC
+     */
+    constructor(game, isHumanPlayer) {
         this.id = randomUint32ID(game.characters, game.usedCharacterIDs);
-        this.isHumanPlayer = isHumanPlayer; // true for player and false for NPC
+        this.isHumanPlayer = isHumanPlayer;
 
         // initial orientation
         this.x = Math.random() * game.mapSize;
         this.z = Math.random() * game.mapSize;
-        this.angle = Math.PI * (2 / 2); // facing south. it doesn't have to be zero
+        this.angle = CONSTANTS.DIRECTIONS.DOWN; // facing south. it doesn't have to be zero
 
-        this.movement_speed = config.player.defaultMovementSpeed;
+        // movement
+        this.movement_speed = config.character.defaultMovementSpeed;
         this.isMoving = false;
 
         // collision
@@ -434,12 +452,6 @@ class Character {
 
         this.combat = {}; // cooldowns, etc.   
 
-        if (!isHumanPlayer) {
-            this.aggroTable = []; // a list of player-aggro pairs (.player and .aggro object names)
-            this.aggroRadius = 10;
-            this.movement_speed = 0.1;
-        }
-
         game.characters.push(this);
     }
 
@@ -448,19 +460,19 @@ class Character {
      * @param {Number} direction 1 = up, 2 = left, 3 = down, 4 = right
      */
     move(direction) {
-        if (this.isAlive) {
+        if (this.isAlive) { // will need to do additional checks for stuff like stuns
             switch (direction) {
                 case 1:
-                    this.angle = Math.PI * (0 / 2);
+                    this.angle = CONSTANTS.DIRECTIONS.UP;
                     break;
                 case 2:
-                    this.angle = -Math.PI * (1 / 2);
+                    this.angle = CONSTANTS.DIRECTIONS.LEFT;
                     break;
                 case 3:
-                    this.angle = Math.PI * (2 / 2);
+                    this.angle = CONSTANTS.DIRECTIONS.DOWN;
                     break;
                 case 4:
-                    this.angle = -Math.PI * (3 / 2);
+                    this.angle = CONSTANTS.DIRECTIONS.RIGHT;
                     break;
             }
 
@@ -491,6 +503,24 @@ class Character {
                 }
             }
         }
+    }
+}
+
+class NPC extends Character {
+    constructor(game) {
+        super(game, false);
+
+        this.aggroTable = []; // a list of player-aggro pairs (.player and .aggro object names)
+        this.aggroRadius = 10;
+        this.movement_speed = 0.1;
+
+        this.leashLocation = { x: this.x, z: this.z };
+    }
+}
+
+class Player extends Character {
+    constructor(game) {
+        super(game, true);
     }
 }
 
