@@ -63,9 +63,7 @@ function create_character(id, x, z, angle, type) {
         // add weapon and attach it
         BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'staff.babylon', scene).then(function (meshes) {
             const weaponMesh = meshes.meshes[0];
-            weaponMesh.attachToBone(mesh.skeleton.bones[mesh.skeleton.getBoneIndexByName('RightHand')], mesh);
-            weaponMesh.rotation.x = Math.PI * (-1 / 2);
-            weaponMesh.position.y += 0.5;
+            weaponMesh.attachToBone(mesh.skeleton.bones[mesh.skeleton.getBoneIndexByName('WeaponGrip')], mesh);
         });
 
         // animation
