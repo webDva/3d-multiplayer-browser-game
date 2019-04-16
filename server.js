@@ -70,6 +70,12 @@ const CONSTANTS = {
         LEFT: -Math.PI * (1 / 2),
         DOWN: Math.PI * (2 / 2),
         RIGHT: -Math.PI * (3 / 2)
+    },
+    MOVEMENT: {
+        UP: 1,
+        LEFT: 2,
+        DOWN: 3,
+        RIGHT: 4
     }
 };
 
@@ -339,51 +345,12 @@ class Game {
                 });
         });
 
-        // NPC aggro initiation/human player detection by NPC
+        // NPC loop
         this.characters.filter(character => {
             return (!character.isHumanPlayer && character.isAlive);
         })
             .forEach(npc => {
-                if (npc.aggroTable.length === 0) { // if not aggroed already
-                    this.characters.filter(character => {
-                        return (character.isHumanPlayer && character.isAlive);
-                    })
-                        .forEach(humanPlayer => {
-                            if (Math.sqrt(Math.pow(npc.x - humanPlayer.x, 2) + Math.pow(npc.z - humanPlayer.z, 2)) <= npc.aggroRadius) {
-                                npc.aggroTable.push({ player: humanPlayer, aggro: 10 });
-                                transmitPlayer(createBinaryFrame(2, [{ type: 'Uint32', value: npc.id }]), humanPlayer); // only display the aggro icon on detection and not when the player initiates the fight
-                            }
-                        });
-                }
-            });
-
-        // NPC chases a target
-        this.characters.filter(character => {
-            return (!character.isHumanPlayer && character.isAlive);
-        })
-            .filter(npc => {
-                // remove players that are dead or don't exist anymore
-                npc.aggroTable.forEach(aggroPair => {
-                    if (!this.characters.includes(aggroPair.player) || !aggroPair.player.isAlive) {
-                        npc.aggroTable.splice(npc.aggroTable.indexOf(aggroPair), 1);
-                    }
-                });
-
-                return npc.aggroTable.length !== 0;
-            })
-            .forEach(npc => {
-                // determine who has the highest aggro
-                let maximumAggro = 0;
-                let target = npc.aggroTable[0].player; // would need to deal with players who decreased their enemity
-                npc.aggroTable.forEach(aggroPair => {
-                    if (aggroPair.aggro > maximumAggro) {
-                        maximumAggro = aggroPair.aggro;
-                        target = aggroPair.player;
-                    }
-                });
-
-                // chase the target with the highest aggro
-                npc.moveTo(target.x, target.z);
+                npc.run();
             });
     }
 
@@ -432,6 +399,7 @@ class Character {
      * @param {boolean} isHumanPlayer true for human player and false for NPC
      */
     constructor(game, isHumanPlayer) {
+        this.game = game;
         this.id = randomUint32ID(game.characters, game.usedCharacterIDs);
         this.isHumanPlayer = isHumanPlayer;
 
@@ -462,18 +430,18 @@ class Character {
      * @param {Number} direction 1 = up, 2 = left, 3 = down, 4 = right
      */
     move(direction) {
-        if (this.isAlive) { // will need to do additional checks for stuff like stuns
+        if (this.isAlive) { // will need to do additional checks for stuff like stuns. collision detection will be handled outside this function and thus by the collision detection routine
             switch (direction) {
-                case 1:
+                case CONSTANTS.MOVEMENT.UP:
                     this.angle = CONSTANTS.DIRECTIONS.UP;
                     break;
-                case 2:
+                case CONSTANTS.MOVEMENT.LEFT:
                     this.angle = CONSTANTS.DIRECTIONS.LEFT;
                     break;
-                case 3:
+                case CONSTANTS.MOVEMENT.DOWN:
                     this.angle = CONSTANTS.DIRECTIONS.DOWN;
                     break;
-                case 4:
+                case CONSTANTS.MOVEMENT.RIGHT:
                     this.angle = CONSTANTS.DIRECTIONS.RIGHT;
                     break;
             }
@@ -493,15 +461,15 @@ class Character {
         if (Math.abs(x - this.x) > distanceThreshold || Math.abs(z - this.z) > distanceThreshold) {
             if (Math.abs(x - this.x) > movementDistanceThreshold) {
                 if (this.x - x > 0) {
-                    this.move(2);
+                    this.move(CONSTANTS.MOVEMENT.LEFT);
                 } else {
-                    this.move(4);
+                    this.move(CONSTANTS.MOVEMENT.RIGHT);
                 }
             } else if (Math.abs(z - this.z) > movementDistanceThreshold) {
                 if (this.z - z > 0) {
-                    this.move(3);
+                    this.move(CONSTANTS.MOVEMENT.DOWN);
                 } else {
-                    this.move(1);
+                    this.move(CONSTANTS.MOVEMENT.UP);
                 }
             }
         }
@@ -518,11 +486,72 @@ class NPC extends Character {
 
         this.leashLocation = { x: this.x, z: this.z };
     }
+
+    // NPC aggro initiation/human player detection by NPC
+    aggroScan() {
+        if (this.aggroTable.length === 0) { // if not aggroed already
+            this.game.characters.filter(character => {
+                return (character.isHumanPlayer && character.isAlive);
+            })
+                .forEach(humanPlayer => {
+                    if (pointInCircleCollision(humanPlayer, this, this.aggroRadius)) {
+                        this.aggroTable.push({ player: humanPlayer, aggro: 10 });
+                        transmitPlayer(createBinaryFrame(2, [{ type: 'Uint32', value: this.id }]), humanPlayer); // only display the aggro icon on detection and not when the player initiates the fight
+                    }
+                });
+        }
+    }
+
+    // NPC chases a target
+    chase() {
+        // remove players that are dead or don't exist anymore
+        this.aggroTable.forEach(aggroPair => {
+            if (!this.game.characters.includes(aggroPair.player) || !aggroPair.player.isAlive) {
+                this.aggroTable.splice(this.aggroTable.indexOf(aggroPair), 1);
+            }
+        });
+
+        if (this.aggroTable.length !== 0) {
+            // determine who has the highest aggro
+            let maximumAggro = 0;
+            let target = this.aggroTable[0].player; // would need to deal with players who decreased their enemity
+            this.aggroTable.forEach(aggroPair => {
+                if (aggroPair.aggro > maximumAggro) {
+                    maximumAggro = aggroPair.aggro;
+                    target = aggroPair.player;
+                }
+            });
+
+            // chase the target with the highest aggro
+            this.moveTo(target.x, target.z);
+        }
+    }
+
+    // loop function
+    run() {
+        this.aggroScan();
+        this.chase();
+    }
 }
 
 class Player extends Character {
     constructor(game) {
         super(game, true);
+    }
+}
+
+/**
+ * Performs point in cicle collision detection. `point` and `circle` can be a character or other type of object. Each must have `.x` and `.z` member variables.
+ * @param {*} point The point to check for. Must have `.x` and `.z` coordinate members.
+ * @param {*} circle Provides the center of the circle. Must have `.x` and `.z` coordinate members.
+ * @param {Number} circleRadius The radius of the circle.
+ * @return `true` if the point collides with the circle, `false` otherwise. 
+ */
+function pointInCircleCollision(point, circle, circleRadius) {
+    if (Math.sqrt(Math.pow(point.x - circle.x, 2) + Math.pow(point.z - circle.z, 2)) <= circleRadius) {
+        return true;
+    } else {
+        return false;
     }
 }
 
