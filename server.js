@@ -452,13 +452,14 @@ class Character {
 
     /**
      * moves to a specific location. will need to add collision checking that accounts for collision box sizes on collision
-     * @param {*} x 
-     * @param {*} z 
-     * @param {*} distanceThreshold how far from the target
-     * @param {*} movementDistanceThreshold how many "pixels" from an axis
+     * @param {Number} x The target location's x coordinate
+     * @param {Number} z The target location's z coordinate
+     * @param {Number} distanceThreshold how far from the target
+     * @param {Number} movementDistanceThreshold how many "pixels" from an axis
+     * @return {Boolean} `true` if the character has arrived at the target location, `false` otherwise
      */
     moveTo(x, z, distanceThreshold = 3, movementDistanceThreshold = 1) {
-        if (Math.abs(x - this.x) > distanceThreshold || Math.abs(z - this.z) > distanceThreshold) {
+        if (Math.abs(x - this.x) > distanceThreshold || Math.abs(z - this.z) > distanceThreshold) { // has not yet arrived at target location
             if (Math.abs(x - this.x) > movementDistanceThreshold) {
                 if (this.x - x > 0) {
                     this.move(CONSTANTS.MOVEMENT.LEFT);
@@ -472,6 +473,10 @@ class Character {
                     this.move(CONSTANTS.MOVEMENT.UP);
                 }
             }
+
+            return false;
+        } else {
+            return true; // has arrived at the target location
         }
     }
 }
@@ -485,6 +490,7 @@ class NPC extends Character {
         this.movement_speed = 0.1;
 
         this.leashLocation = { x: this.x, z: this.z };
+        this.isReseting = false;
     }
 
     // NPC aggro initiation/human player detection by NPC
@@ -503,7 +509,7 @@ class NPC extends Character {
     }
 
     // NPC chases a target
-    chase() {
+    pursue() {
         // remove players that are dead or don't exist anymore
         this.aggroTable.forEach(aggroPair => {
             if (!this.game.characters.includes(aggroPair.player) || !aggroPair.player.isAlive) {
@@ -529,8 +535,25 @@ class NPC extends Character {
 
     // loop function
     run() {
-        this.aggroScan();
-        this.chase();
+        // if the NPC is outside its leashing bounds, reset
+        if (!pointInCircleCollision(this, this.leashLocation, 40)) {
+            this.isReseting = true;
+            this.aggroTable = [];
+            this.movement_speed = 3;
+        }
+
+        if (!this.isReseting) {
+            this.aggroScan();
+            this.pursue();
+        } else {
+            if (this.moveTo(this.leashLocation.x, this.leashLocation.z)) {
+                this.isReseting = false;
+
+                // have to find a way to organize this for specific mobs
+                this.movement_speed = 0.1;
+                this.health = 100;
+            }
+        }
     }
 }
 
