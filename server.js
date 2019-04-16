@@ -456,7 +456,6 @@ class Character {
      * @param {Number} z The target location's z coordinate
      * @param {Number} distanceThreshold how far from the target
      * @param {Number} movementDistanceThreshold how many "pixels" from an axis
-     * @return {Boolean} `true` if the character has arrived at the target location, `false` otherwise
      */
     moveTo(x, z, distanceThreshold = 3, movementDistanceThreshold = 1) {
         if (Math.abs(x - this.x) > distanceThreshold || Math.abs(z - this.z) > distanceThreshold) { // has not yet arrived at target location
@@ -473,10 +472,6 @@ class Character {
                     this.move(CONSTANTS.MOVEMENT.UP);
                 }
             }
-
-            return false;
-        } else {
-            return true; // has arrived at the target location
         }
     }
 }
@@ -546,7 +541,9 @@ class NPC extends Character {
             this.aggroScan();
             this.pursue();
         } else {
-            if (this.moveTo(this.leashLocation.x, this.leashLocation.z)) {
+            if (!pointInCircleCollision(this, this.leashLocation, 5)) {
+                this.moveTo(this.leashLocation.x, this.leashLocation.z);
+            } else {
                 this.isReseting = false;
 
                 // have to find a way to organize this for specific mobs
