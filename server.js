@@ -455,9 +455,9 @@ class Character {
      * @param {Number} x The target location's x coordinate
      * @param {Number} z The target location's z coordinate
      * @param {Number} distanceThreshold how far from the target
-     * @param {Number} movementDistanceThreshold how many "pixels" from an axis
      */
-    moveTo(x, z, distanceThreshold = 3, movementDistanceThreshold = 1) {
+    moveTo(x, z, distanceThreshold = 3) {
+        const movementDistanceThreshold = this.movement_speed; // how far from an axis
         if (Math.abs(x - this.x) > distanceThreshold || Math.abs(z - this.z) > distanceThreshold) { // has not yet arrived at target location
             if (Math.abs(x - this.x) > movementDistanceThreshold) {
                 if (this.x - x > 0) {
@@ -485,6 +485,7 @@ class NPC extends Character {
         this.movement_speed = 0.1;
 
         this.leashLocation = { x: this.x, z: this.z };
+        this.leashRadius = 40;
         this.isReseting = false;
     }
 
@@ -531,7 +532,7 @@ class NPC extends Character {
     // loop function
     run() {
         // if the NPC is outside its leashing bounds, reset
-        if (!pointInCircleCollision(this, this.leashLocation, 40)) {
+        if (!pointInCircleCollision(this, this.leashLocation, this.leashRadius)) {
             this.isReseting = true;
             this.aggroTable = [];
             this.movement_speed = 3;
@@ -541,7 +542,7 @@ class NPC extends Character {
             this.aggroScan();
             this.pursue();
         } else {
-            if (!pointInCircleCollision(this, this.leashLocation, 5)) {
+            if (!pointInCircleCollision(this, this.leashLocation, this.leashRadius * (1 / 10))) {
                 this.moveTo(this.leashLocation.x, this.leashLocation.z);
             } else {
                 this.isReseting = false;
