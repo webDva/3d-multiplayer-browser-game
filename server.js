@@ -251,7 +251,13 @@ ws_server.on('connection', websocket => {
                         owner: player.id
                     };
                     game.projectiles.push(projectile);
-                    game.networkUpdates.combat.newProjectiles.push(projectile);
+                    game.addDelayedBroadcast(createBinaryFrame(5, [
+                        { type: 'Float32', value: projectile.position.x },
+                        { type: 'Float32', value: projectile.position.z },
+                        { type: 'Float32', value: projectile.angle },
+                        { type: 'Float32', value: projectile.speed },
+                        { type: 'Uint32', value: projectile.owner }
+                    ]));
                 }
             }
 
@@ -275,13 +281,8 @@ class Game {
     constructor() {
         this.characters = [];
         this.mapSize = config.mapSize; // width and height
-        this.networkUpdates = {
-            combat: {
-                newProjectiles: [],
-                deaths: [],
-                respawns: [] // or joins
-            }
-        };
+        this.delayedBroadcasts = [];
+        this.delayedTransmitPlayers = [];
         this.combat = {
             attacks: []
         };
@@ -375,20 +376,25 @@ class Game {
         });
         broadcast(createBinaryFrame(9, healths));
 
-        // new projectiles
-        if (this.networkUpdates.combat.newProjectiles.length > 0) {
-            const projectiles = [];
-            projectiles.push({ type: 'Uint16', value: this.networkUpdates.combat.newProjectiles.length });
-            this.networkUpdates.combat.newProjectiles.forEach(projectile => {
-                projectiles.push({ type: 'Float32', value: projectile.position.x });
-                projectiles.push({ type: 'Float32', value: projectile.position.z });
-                projectiles.push({ type: 'Float32', value: projectile.angle });
-                projectiles.push({ type: 'Float32', value: projectile.speed });
-                projectiles.push({ type: 'Uint32', value: projectile.owner });
-                this.networkUpdates.combat.newProjectiles.splice(this.networkUpdates.combat.newProjectiles.indexOf(projectile), 1);
-            });
-            broadcast(createBinaryFrame(5, projectiles));
-        }
+        // delayed broadcasts
+        this.delayedBroadcasts.forEach(delayedMessage => {
+            this.delayedBroadcasts.splice(this.delayedBroadcasts.indexOf(delayedMessage), 1);
+            broadcast(delayedMessage.data, delayedMessage.exception);
+        });
+
+        // delayed transmitPlayers
+        this.delayedTransmitPlayers.forEach(delayedMessage => {
+            this.delayedTransmitPlayers.splice(this.delayedTransmitPlayers.indexOf(delayedMessage), 1);
+            transmitPlayer(delayedMessage.data, delayedMessage.player);
+        });
+    }
+
+    addDelayedBroadcast(data, exception = null) {
+        this.delayedBroadcasts.push({ data: data, exception: exception });
+    }
+
+    addDelayedTransmitPlayer(data, player) {
+        this.delayedTransmitPlayers.push({ data: data, player: player });
     }
 }
 
@@ -498,7 +504,7 @@ class NPC extends Character {
                 .forEach(humanPlayer => {
                     if (pointInCircleCollision(humanPlayer, this, this.aggroRadius)) {
                         this.aggroTable.push({ player: humanPlayer, aggro: 10 });
-                        transmitPlayer(createBinaryFrame(2, [{ type: 'Uint32', value: this.id }]), humanPlayer); // only display the aggro icon on detection and not when the player initiates the fight
+                        this.game.addDelayedTransmitPlayer(createBinaryFrame(2, [{ type: 'Uint32', value: this.id }]), humanPlayer); // only display the aggro icon on detection and not when the player initiates the fight
                     }
                 });
         }
@@ -530,14 +536,14 @@ class NPC extends Character {
         }
 
         if (!this.isReseting) {
-            if (this.aggroTable.length !== 0) { // if aggroed
-                // remove players that are dead or don't exist anymore
-                this.aggroTable.forEach(aggroPair => {
-                    if (!this.game.characters.includes(aggroPair.player) || !aggroPair.player.isAlive) {
-                        this.aggroTable.splice(this.aggroTable.indexOf(aggroPair), 1);
-                    }
-                });
+            // remove players that are dead or don't exist anymore
+            this.aggroTable.forEach(aggroPair => {
+                if (!this.game.characters.includes(aggroPair.player) || !aggroPair.player.isAlive) {
+                    this.aggroTable.splice(this.aggroTable.indexOf(aggroPair), 1);
+                }
+            });
 
+            if (this.aggroTable.length !== 0) { // if aggroed
                 // pursue players with aggro
                 this.pursue();
             } else { // else if not aggroed

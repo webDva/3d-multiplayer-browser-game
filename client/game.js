@@ -185,16 +185,13 @@ websocket.onmessage = (event) => {
 
         // new projectiles
         if (dataview.getUint8(0) === 5) {
-            for (let i = 0; i < dataview.getUint16(1); i++) {
-                const projectile = {
-                    particleSystem: create_particles(dataview.getFloat32(3 + i * 20), dataview.getFloat32(7 + i * 20)),
-                    forwardVector: dataview.getFloat32(11 + i * 20),
-                    creationTime: Date.now(),
-                    speed: dataview.getFloat32(15 + i * 20),
-                    owner: dataview.getUint32(19 + i * 20)
-                };
-                projectile_list.push(projectile);
-            }
+            projectile_list.push({
+                particleSystem: create_particles(dataview.getFloat32(1), dataview.getFloat32(5)),
+                forwardVector: dataview.getFloat32(9),
+                creationTime: Date.now(),
+                speed: dataview.getFloat32(13),
+                owner: dataview.getUint32(17)
+            });
         }
 
         // player disconnect
