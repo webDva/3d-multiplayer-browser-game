@@ -40,11 +40,7 @@ const player = {
     mesh: null,
     struct: null,
 
-    movement: 0,
-
-    combat: {
-        attack: false
-    }
+    movement: 0
 };
 const player_list = [];
 let session_started = false;
@@ -226,28 +222,19 @@ websocket.onopen = () => {
     websocket.send(JSON.stringify({ type: 'join' }));
 };
 
-// movement controls
+// keyboard mapping and input
+const keyboardMap = {};
+const keyboardHandler = function (e) {
+    e = e || event; // Apparently some IE solution
+    keyboardMap[e.keyCode] = e.type == 'keydown';
+};
+
+document.addEventListener('keydown', keyboardHandler);
+document.addEventListener('keyup', keyboardHandler);
+
+// for keyboard input that can't be inside the network pulse loop
 document.addEventListener('keydown', function (event) {
     const char = String.fromCharCode(event.keyCode);
-
-    // arrow keys
-    if (event.keyCode === 38) {
-        player.movement = 1;
-    }
-    if (event.keyCode === 37) {
-        player.movement = 2;
-    }
-    if (event.keyCode === 40) {
-        player.movement = 3;
-    }
-    if (event.keyCode === 39) {
-        player.movement = 4;
-    }
-
-    // combat attacks/spells
-    if (char === '1') {
-        player.combat.attack = true;
-    }
 
     // "I" for inventory
     if (char === 'I') {
@@ -262,12 +249,24 @@ document.addEventListener('keydown', function (event) {
 // client network update pulse
 setInterval(() => {
     // player wants to attack
-    if (player.combat.attack) {
+    if (keyboardMap['1'.charCodeAt()]) {
         const arraybuffer = new ArrayBuffer(1);
         const dataview = new DataView(arraybuffer);
         dataview.setUint8(0, 2);
         websocket.send(dataview);
-        player.combat.attack = false;
+    }
+
+    // arrow keys movement
+    if (keyboardMap[38]) {
+        player.movement = 1;
+    } else if (keyboardMap[37]) {
+        player.movement = 2;
+    } else if (keyboardMap[40]) {
+        player.movement = 3;
+    } else if (keyboardMap[39]) {
+        player.movement = 4;
+    } else {
+        player.movement = 0;
     }
 
     // send player movement requests
@@ -277,7 +276,6 @@ setInterval(() => {
         dataview.setUint8(0, 3);
         dataview.setUint8(1, player.movement);
         websocket.send(dataview);
-        player.movement = 0;
     }
 }, 1000 / 20);
 
