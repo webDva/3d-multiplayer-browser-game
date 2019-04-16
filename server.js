@@ -506,27 +506,18 @@ class NPC extends Character {
 
     // NPC chases a target
     pursue() {
-        // remove players that are dead or don't exist anymore
+        // determine who has the highest aggro
+        let maximumAggro = 0;
+        let target = this.aggroTable[0].player; // would need to deal with players who decreased their enemity
         this.aggroTable.forEach(aggroPair => {
-            if (!this.game.characters.includes(aggroPair.player) || !aggroPair.player.isAlive) {
-                this.aggroTable.splice(this.aggroTable.indexOf(aggroPair), 1);
+            if (aggroPair.aggro > maximumAggro) {
+                maximumAggro = aggroPair.aggro;
+                target = aggroPair.player;
             }
         });
 
-        if (this.aggroTable.length !== 0) {
-            // determine who has the highest aggro
-            let maximumAggro = 0;
-            let target = this.aggroTable[0].player; // would need to deal with players who decreased their enemity
-            this.aggroTable.forEach(aggroPair => {
-                if (aggroPair.aggro > maximumAggro) {
-                    maximumAggro = aggroPair.aggro;
-                    target = aggroPair.player;
-                }
-            });
-
-            // chase the target with the highest aggro
-            this.moveTo(target.x, target.z);
-        }
+        // chase the target with the highest aggro
+        this.moveTo(target.x, target.z);
     }
 
     // loop function
@@ -539,8 +530,19 @@ class NPC extends Character {
         }
 
         if (!this.isReseting) {
-            this.aggroScan();
-            this.pursue();
+            if (this.aggroTable.length !== 0) { // if aggroed
+                // remove players that are dead or don't exist anymore
+                this.aggroTable.forEach(aggroPair => {
+                    if (!this.game.characters.includes(aggroPair.player) || !aggroPair.player.isAlive) {
+                        this.aggroTable.splice(this.aggroTable.indexOf(aggroPair), 1);
+                    }
+                });
+
+                // pursue players with aggro
+                this.pursue();
+            } else { // else if not aggroed
+                this.aggroScan();
+            }
         } else {
             if (!pointInCircleCollision(this, this.leashLocation, this.leashRadius * (1 / 10))) {
                 this.moveTo(this.leashLocation.x, this.leashLocation.z);
