@@ -40,7 +40,8 @@ const player = {
     mesh: null,
     struct: null,
 
-    movement: 0
+    movement: 0,
+    touchMovement: 0
 };
 const player_list = [];
 let session_started = false;
@@ -215,7 +216,59 @@ websocket.onmessage = (event) => {
 }
 
 // display DOM user interface
+const virtualDPad = document.getElementById('virtualDPad');
+virtualDPad.style.display = 'block';
+document.getElementById('virtualDPad-image').style.display = 'block';
 
+function areaTriangle(v1, v2, v3) {
+    return Math.abs((v1.x * (v2.y - v3.y) + v2.x * (v3.y - v1.y) + v3.x * (v1.y - v2.y)) / 2);
+}
+
+function pointInTriangle(p, v1, v2, v3) {
+    const areaOriginal = areaTriangle(v1, v2, v3);
+    const area1 = areaTriangle(p, v1, v2);
+    const area2 = areaTriangle(p, v2, v3);
+    const area3 = areaTriangle(p, v1, v3);
+
+    if (area1 + area2 + area3 === areaOriginal) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+virtualDPad.onpointerdown = virtualDPad.onpointermove = function (event) {
+    const bounds = event.target.getBoundingClientRect();
+
+    // vertices coordinates
+    const upperLeft = { x: bounds.left, y: bounds.top };
+    const lowerLeft = { x: bounds.left, y: bounds.top + bounds.height };
+    const upperRight = { x: bounds.left + bounds.width, y: bounds.top };
+    const lowerRight = { x: bounds.left + bounds.width, y: bounds.top + bounds.height };
+    const middle = { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 };
+
+    // triangle coordinates
+    const leftTriangle = { v1: upperLeft, v2: lowerLeft, v3: middle };
+    const upTriangle = { v1: upperLeft, v2: upperRight, v3: middle };
+    const rightTriangle = { v1: upperRight, v2: lowerRight, v3: middle };
+    const downTriangle = { v1: lowerLeft, v2: lowerRight, v3: middle };
+
+    const touchPoint = { x: event.clientX, y: event.clientY };
+
+    if (pointInTriangle(touchPoint, upTriangle.v1, upTriangle.v2, upTriangle.v3)) {
+        player.touchMovement = 1;
+    } else if (pointInTriangle(touchPoint, leftTriangle.v1, leftTriangle.v2, leftTriangle.v3)) {
+        player.touchMovement = 2;
+    } else if (pointInTriangle(touchPoint, downTriangle.v1, downTriangle.v2, downTriangle.v3)) {
+        player.touchMovement = 3;
+    } else if (pointInTriangle(touchPoint, rightTriangle.v1, rightTriangle.v2, rightTriangle.v3)) {
+        player.touchMovement = 4;
+    }
+};
+
+virtualDPad.onpointerup = virtualDPad.onpointerout = function () {
+    player.touchMovement = 0;
+};
 
 // open the WebSocket connection
 websocket.onopen = () => {
@@ -257,13 +310,13 @@ setInterval(() => {
     }
 
     // arrow keys movement
-    if (keyboardMap[38]) {
+    if (keyboardMap[38] || player.touchMovement == 1) {
         player.movement = 1;
-    } else if (keyboardMap[37]) {
+    } else if (keyboardMap[37] || player.touchMovement == 2) {
         player.movement = 2;
-    } else if (keyboardMap[40]) {
+    } else if (keyboardMap[40] || player.touchMovement == 3) {
         player.movement = 3;
-    } else if (keyboardMap[39]) {
+    } else if (keyboardMap[39] || player.touchMovement == 4) {
         player.movement = 4;
     } else {
         player.movement = 0;

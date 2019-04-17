@@ -24,3 +24,10 @@ html, body {
     justify-content: center;
     align-items: center;
 }
+
+.virtualDPad {
+    left: 20px;
+    bottom: 20px;
+    height: 40%;
+    width: 32%;
+}
