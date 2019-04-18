@@ -60,7 +60,7 @@ const config = {
         defaultMovementSpeed: 1,
         collisionBoxSize: 3 // a square
     },
-    mapSize: 100,
+    mapSize: 50,
     pingTime: 40
 };
 
@@ -316,8 +316,29 @@ class Game {
         this.characters.filter(character => {
             return character.isMoving;
         })
-            .filter(character => { // collision detection
-                // for now, there is no collision detection
+            .filter(character => { // collision detection with the map boundary
+                if (character.angle === CONSTANTS.DIRECTIONS.UP) {
+                    if (character.z + (character.collisionBoxSize / 2) + character.movement_speed > this.mapSize) {
+                        character.isMoving = false;
+                        return false;
+                    }
+                } else if (character.angle === CONSTANTS.DIRECTIONS.LEFT) {
+                    if (character.x - (character.collisionBoxSize / 2) - character.movement_speed < 0) {
+                        character.isMoving = false;
+                        return false;
+                    }
+                } else if (character.angle === CONSTANTS.DIRECTIONS.DOWN) {
+                    if (character.z - (character.collisionBoxSize / 2) - character.movement_speed < 0) {
+                        character.isMoving = false;
+                        return false;
+                    }
+                } else if (character.angle === CONSTANTS.DIRECTIONS.RIGHT) {
+                    if (character.x + (character.collisionBoxSize / 2) + character.movement_speed > this.mapSize) {
+                        character.isMoving = false;
+                        return false;
+                    }
+                }
+
                 return true;
             })
             .forEach(character => {
@@ -409,17 +430,17 @@ class Character {
         this.id = randomUint32ID(game.characters, game.usedCharacterIDs);
         this.isHumanPlayer = isHumanPlayer;
 
+        // collision
+        this.collisionBoxSize = config.character.collisionBoxSize;
+
         // initial orientation
-        this.x = Math.random() * game.mapSize;
-        this.z = Math.random() * game.mapSize;
+        this.x = Math.random() * (game.mapSize - this.collisionBoxSize);
+        this.z = Math.random() * (game.mapSize - this.collisionBoxSize);
         this.angle = CONSTANTS.DIRECTIONS.DOWN; // facing south. it doesn't have to be zero
 
         // movement
         this.movement_speed = config.character.defaultMovementSpeed;
         this.isMoving = false;
-
-        // collision
-        this.box = null; // empty for now
 
         this.health = 100; // has to be a signed 32-bit integer for negative health values
 

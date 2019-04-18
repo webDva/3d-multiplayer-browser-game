@@ -21,7 +21,7 @@ const inventoryCamera = new BABYLON.ArcRotateCamera("InventoryCamera", 1, 1, 4, 
 inventoryCamera.attachControl(canvas);
 
 // ground mesh
-const groundSize = 100;
+const groundSize = 50;
 const ground = BABYLON.Mesh.CreateGround("ground", groundSize, groundSize, 1, scene);
 ground.setPivotMatrix(BABYLON.Matrix.Translation(groundSize / 2, 0, groundSize / 2), false);
 ground.material = new BABYLON.GridMaterial('groundMaterial', scene);
