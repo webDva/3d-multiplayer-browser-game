@@ -58,7 +58,7 @@ const config = {
     physicsTickRate: 30,
     character: {
         defaultMovementSpeed: 1,
-        collisionBoxSize: 3
+        collisionBoxSize: 3 // a square
     },
     mapSize: 100,
     pingTime: 40
@@ -578,6 +578,23 @@ class Player extends Character {
  */
 function pointInCircleCollision(point, circle, circleRadius) {
     if (Math.sqrt(Math.pow(point.x - circle.x, 2) + Math.pow(point.z - circle.z, 2)) <= circleRadius) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+/**
+ * Axis-aligned bounding boxes collision detection between two objects with an optional extension prediction.
+ * @param {*} a The first object to check for. Must have `.x`, `.z`, and `.collisionBoxSize` members. Can have an extension for collision prediction with the parameter `a_extension`.
+ * @param {*} b The second object to check for. Must have `.x`, `.z`, and `.collisionBoxSize` members.
+ * @param {*} a_extension Used for predictions. Must have `.x` and `.z` members. If the axis has no extension, then it should be `0`.
+ */
+function AABBCollision(a, b, a_extension = { x: 0, z: 0 }) {
+    if (a.x - (a.collisionBoxSize / 2) + a_extension.x < b.x - (b.collisionBoxSize / 2) &&
+        a.x + (a.collisionBoxSize / 2) + a_extension.x > b.x - (b.collisionBoxSize / 2) &&
+        a.z - (a.collisionBoxSize / 2) + a_extension.z < b.z - (b.collisionBoxSize / 2) &&
+        a.z + (a.collisionBoxSize / 2) + a_extension.z > b.z - (b.collisionBoxSize / 2)) {
         return true;
     } else {
         return false;
