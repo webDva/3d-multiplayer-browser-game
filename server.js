@@ -54,14 +54,14 @@ if (env.production) {
 
 const config = {
     PORT: 3000,
-    networkUpdatePulseRate: 10,
-    physicsTickRate: 30,
+    networkUpdatePulseRate: 1000 / 10,
+    physicsTickRate: 1000 / 30,
     character: {
         defaultMovementSpeed: 1,
         collisionBoxSize: 3 // a square
     },
     mapSize: 50,
-    pingTime: 40
+    pingTime: 1000 * 40
 };
 
 const CONSTANTS = {
@@ -626,13 +626,13 @@ const game = new Game();
 
 setInterval(function () {
     game.physicsLoop();
-}, 1000 / config.physicsTickRate);
+}, config.physicsTickRate);
 setInterval(function () {
     game.gameLogicLoop();
-}, 1000 / config.physicsTickRate);
+}, config.physicsTickRate);
 setInterval(function () {
     game.sendNetworkUpdates();
-}, 1000 / config.networkUpdatePulseRate);
+}, config.networkUpdatePulseRate);
 
 // ping-pong heartbeat
 setInterval(function () {
@@ -648,4 +648,4 @@ setInterval(function () {
             websocket.ping();
         }
     });
-}, 1000 * config.pingTime);
+}, config.pingTime);
