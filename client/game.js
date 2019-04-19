@@ -1,3 +1,98 @@
+class Game {
+    constructor() {
+        this.player = new Player();
+
+        this.session_started = false;
+
+        this.characters = [];
+        this.projectiles = [];
+
+        this.mapSize = 50;
+
+        this.clientNetworkPulseRate = 1000 / 20;
+        this.physicsTickRate = 1000 / 30;
+        this.lerpFactor = 60;
+
+        this.keyboardMap = {};
+        this.isTouchScreen = 'ontouchstart' in document.documentElement || (window.navigator.maxTouchPoints && window.navigator.maxTouchPoints >= 1);
+    }
+
+    create_character(id, x, z, angle, type) {
+        const self = this;
+        BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'circle2.babylon', scene).then(function (imported) {
+            const mesh = imported.meshes[0];
+            mesh.material = new BABYLON.StandardMaterial('', scene);
+            mesh.material.diffuseColor = BABYLON.Color3.Blue();
+
+            if (type === 0) { // if an NPC
+                mesh.material.diffuseColor = BABYLON.Color3.Red();
+            }
+
+            // add weapon and attach it
+            BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'staff.babylon', scene).then(function (meshes) {
+                const weaponMesh = meshes.meshes[0];
+                weaponMesh.attachToBone(mesh.skeleton.bones[mesh.skeleton.getBoneIndexByName('WeaponGrip')], mesh);
+            });
+
+            // animation
+            mesh.skeleton.animationPropertiesOverride = new BABYLON.AnimationPropertiesOverride();
+            mesh.skeleton.animationPropertiesOverride.enableBlending = true;
+            mesh.skeleton.animationPropertiesOverride.blendingSpeed = 0.2;
+            mesh.skeleton.animationPropertiesOverride.loopMode = 1;
+            mesh.idleRange = mesh.skeleton.getAnimationRange('IdleAnimation');
+            mesh.walkRange = mesh.skeleton.getAnimationRange('Walk');
+            mesh.idleRange.animation = scene.beginAnimation(mesh.skeleton, mesh.idleRange.from, mesh.idleRange.to, true, 0.5);
+
+            mesh.KGAME_TYPE = 1; // KGAME_TYPE 1 means that it is a kawaii game mesh of type 1
+            const character_struct = {
+                id: id,
+                x: x,
+                z: z,
+                mesh: mesh,
+                eulerY: angle,
+                health: 0,
+                type: type
+            };
+            self.characters.push(character_struct);
+            mesh.position.x = x;
+            mesh.position.z = z;
+            mesh.rotation.y = angle;
+
+            // for walk animation
+            mesh.previousX = x;
+            mesh.previousZ = z;
+
+            if (self.player.id === id) {
+                self.player.mesh = mesh;
+                self.player.struct = character_struct;
+                camera.lockedTarget = self.player.mesh;
+                inventoryCamera.target = self.player.mesh;
+
+                self.session_started = true;
+            }
+        });
+    }
+
+    // keyboard mapping and input
+    keyboardHandler(e) {
+        e = e || event; // Apparently some IE solution
+        this.keyboardMap[e.keyCode] = e.type == 'keydown';
+    }
+}
+
+class Player {
+    constructor() {
+        this.id;
+        this.mesh;
+        this.struct;
+
+        this.movement = 0;
+        this.touchMovement = 0;
+    }
+}
+
+const game = new Game();
+
 const canvas = document.getElementById("canvas");
 const engine = new BABYLON.Engine(canvas, true, { stencil: true });
 
@@ -21,7 +116,7 @@ const inventoryCamera = new BABYLON.ArcRotateCamera("InventoryCamera", 1, 1, 4, 
 inventoryCamera.attachControl(canvas);
 
 // ground mesh
-const groundSize = 50;
+const groundSize = game.mapSize;
 const ground = BABYLON.Mesh.CreateGround("ground", groundSize, groundSize, 1, scene);
 ground.setPivotMatrix(BABYLON.Matrix.Translation(groundSize / 2, 0, groundSize / 2), false);
 ground.material = new BABYLON.GridMaterial('groundMaterial', scene);
@@ -34,73 +129,6 @@ ground.material.majorUnitFrequency = 2;
 const light = new BABYLON.PointLight('light', new BABYLON.Vector3(groundSize / 2, 100, groundSize / 2), scene);
 light.diffuse = new BABYLON.Color3(1, 1, 1);
 light.specular = new BABYLON.Color3(1, 1, 1);
-
-const player = {
-    id: null,
-    mesh: null,
-    struct: null,
-
-    movement: 0,
-    touchMovement: 0
-};
-const player_list = [];
-let session_started = false;
-const projectile_list = [];
-
-function create_character(id, x, z, angle, type) {
-    BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'circle2.babylon', scene).then(function (imported) {
-        const mesh = imported.meshes[0];
-        mesh.material = new BABYLON.StandardMaterial('', scene);
-        mesh.material.diffuseColor = BABYLON.Color3.Blue();
-
-        if (type === 0) { // if an NPC
-            mesh.material.diffuseColor = BABYLON.Color3.Red();
-        }
-
-        // add weapon and attach it
-        BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'staff.babylon', scene).then(function (meshes) {
-            const weaponMesh = meshes.meshes[0];
-            weaponMesh.attachToBone(mesh.skeleton.bones[mesh.skeleton.getBoneIndexByName('WeaponGrip')], mesh);
-        });
-
-        // animation
-        mesh.skeleton.animationPropertiesOverride = new BABYLON.AnimationPropertiesOverride();
-        mesh.skeleton.animationPropertiesOverride.enableBlending = true;
-        mesh.skeleton.animationPropertiesOverride.blendingSpeed = 0.2;
-        mesh.skeleton.animationPropertiesOverride.loopMode = 1;
-        mesh.idleRange = mesh.skeleton.getAnimationRange('IdleAnimation');
-        mesh.walkRange = mesh.skeleton.getAnimationRange('Walk');
-        mesh.idleRange.animation = scene.beginAnimation(mesh.skeleton, mesh.idleRange.from, mesh.idleRange.to, true, 0.5);
-
-        mesh.KGAME_TYPE = 1; // KGAME_TYPE 1 means that it is a kawaii game mesh of type 1
-        const player_struct = {
-            id: id,
-            x: x,
-            z: z,
-            mesh: mesh,
-            eulerY: angle,
-            health: 0,
-            type: type
-        };
-        player_list.push(player_struct);
-        mesh.position.x = x;
-        mesh.position.z = z;
-        mesh.rotation.y = angle;
-
-        // for walk animation
-        mesh.previousX = x;
-        mesh.previousZ = z;
-
-        if (player.id === id) {
-            player.mesh = mesh;
-            player.struct = player_struct;
-            camera.lockedTarget = player.mesh;
-            inventoryCamera.target = player.mesh;
-
-            session_started = true;
-        }
-    });
-}
 
 // particle system handling subsystem
 function create_particles(xPosition, zPosition) {
@@ -146,43 +174,43 @@ websocket.onmessage = (event) => {
 
         // welcome message id sent to the player
         if (dataview.getUint8(0) === 3) {
-            player.id = dataview.getUint32(1);
+            game.player.id = dataview.getUint32(1);
 
             // request map data
             websocket.send(JSON.stringify({ type: 'request_map_data' }));
         }
 
-        // player orientations
+        // character orientations update
         if (dataview.getUint8(0) === 1) {
             for (let i = 0; i < dataview.getUint16(1); i++) {
-                const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(3 + i * 16));
-                if (player_object) {
-                    player_object.x = dataview.getFloat32(7 + i * 16);
-                    player_object.z = dataview.getFloat32(11 + i * 16);
-                    player_object.eulerY = dataview.getFloat32(15 + i * 16);
+                const character = game.characters.find(character => character.id === dataview.getUint32(3 + i * 16));
+                if (character) {
+                    character.x = dataview.getFloat32(7 + i * 16);
+                    character.z = dataview.getFloat32(11 + i * 16);
+                    character.eulerY = dataview.getFloat32(15 + i * 16);
                 }
             }
         }
 
-        // player aggroed a mob
+        // the player aggroed a mob
         if (dataview.getUint8(0) === 2) {
             const mobID = dataview.getUint32(1);
-            const mobObject = player_list.find(player_object => player_object.id === mobID);
+            const mob_character = game.characters.find(character => character.id === mobID);
             const aggroIcon = new BABYLON.Sprite('aggroIcon', aggroIconSpriteManager);
-            aggroIcon.position = new BABYLON.Vector3(mobObject.mesh.position.x, 5, mobObject.mesh.position.z);
+            aggroIcon.position = new BABYLON.Vector3(mob_character.mesh.position.x, 5, mob_character.mesh.position.z);
             setTimeout(function () {
                 aggroIcon.dispose();
             }, 1000);
         }
 
-        // new player joins
+        // a new character arrives on the server
         if (dataview.getUint8(0) === 4) {
-            create_character(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getFloat32(13), dataview.getInt8(17));
+            game.create_character(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getFloat32(13), dataview.getInt8(17));
         }
 
         // new projectiles
         if (dataview.getUint8(0) === 5) {
-            projectile_list.push({
+            game.projectiles.push({
                 particleSystem: create_particles(dataview.getFloat32(1), dataview.getFloat32(5)),
                 forwardVector: dataview.getFloat32(9),
                 creationTime: Date.now(),
@@ -191,20 +219,20 @@ websocket.onmessage = (event) => {
             });
         }
 
-        // player disconnect
+        // a player disconnects
         if (dataview.getUint8(0) === 6) {
             // player objects can be duplicated too,so this would actually need an array from Array.filter
-            const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(1));
-            player_object.mesh.dispose();
-            player_list.splice(player_list.indexOf(player_object), 1);
+            const character = game.characters.find(character => character.id === dataview.getUint32(1));
+            character.mesh.dispose();
+            game.characters.splice(game.characters.indexOf(character), 1);
         }
 
-        // player healths update
+        // character healths update
         if (dataview.getUint8(0) === 9) {
             for (let i = 0; i < dataview.getUint16(1); i++) {
-                const player_object = player_list.find(player_object => player_object.id === dataview.getUint32(3 + i * 8));
-                if (player_object) {
-                    player_object.health = dataview.getInt32(7 + i * 8);
+                const character = game.characters.find(character => character.id === dataview.getUint32(3 + i * 8));
+                if (character) {
+                    character.health = dataview.getInt32(7 + i * 8);
                 }
             }
         }
@@ -256,18 +284,18 @@ virtualDPad.onpointerdown = virtualDPad.onpointermove = function (event) {
     const touchPoint = { x: event.clientX, y: event.clientY };
 
     if (pointInTriangle(touchPoint, upTriangle.v1, upTriangle.v2, upTriangle.v3)) {
-        player.touchMovement = 1;
+        game.player.touchMovement = 1;
     } else if (pointInTriangle(touchPoint, leftTriangle.v1, leftTriangle.v2, leftTriangle.v3)) {
-        player.touchMovement = 2;
+        game.player.touchMovement = 2;
     } else if (pointInTriangle(touchPoint, downTriangle.v1, downTriangle.v2, downTriangle.v3)) {
-        player.touchMovement = 3;
+        game.player.touchMovement = 3;
     } else if (pointInTriangle(touchPoint, rightTriangle.v1, rightTriangle.v2, rightTriangle.v3)) {
-        player.touchMovement = 4;
+        game.player.touchMovement = 4;
     }
 };
 
 virtualDPad.onpointerup = virtualDPad.onpointerout = function () {
-    player.touchMovement = 0;
+    game.player.touchMovement = 0;
 };
 
 // open the WebSocket connection
@@ -275,15 +303,8 @@ websocket.onopen = () => {
     websocket.send(JSON.stringify({ type: 'join' }));
 };
 
-// keyboard mapping and input
-const keyboardMap = {};
-const keyboardHandler = function (e) {
-    e = e || event; // Apparently some IE solution
-    keyboardMap[e.keyCode] = e.type == 'keydown';
-};
-
-document.addEventListener('keydown', keyboardHandler);
-document.addEventListener('keyup', keyboardHandler);
+document.addEventListener('keydown', game.keyboardHandler.bind(game));
+document.addEventListener('keyup', game.keyboardHandler.bind(game));
 
 // for keyboard input that can't be inside the network pulse loop
 document.addEventListener('keydown', function (event) {
@@ -302,7 +323,7 @@ document.addEventListener('keydown', function (event) {
 // client network update pulse
 setInterval(() => {
     // player wants to attack
-    if (keyboardMap['1'.charCodeAt()]) {
+    if (game.keyboardMap['1'.charCodeAt()]) {
         const arraybuffer = new ArrayBuffer(1);
         const dataview = new DataView(arraybuffer);
         dataview.setUint8(0, 2);
@@ -310,27 +331,27 @@ setInterval(() => {
     }
 
     // arrow keys movement
-    if (keyboardMap[38] || player.touchMovement == 1) {
-        player.movement = 1;
-    } else if (keyboardMap[37] || player.touchMovement == 2) {
-        player.movement = 2;
-    } else if (keyboardMap[40] || player.touchMovement == 3) {
-        player.movement = 3;
-    } else if (keyboardMap[39] || player.touchMovement == 4) {
-        player.movement = 4;
+    if (game.keyboardMap[38] || game.player.touchMovement == 1) {
+        game.player.movement = 1;
+    } else if (game.keyboardMap[37] || game.player.touchMovement == 2) {
+        game.player.movement = 2;
+    } else if (game.keyboardMap[40] || game.player.touchMovement == 3) {
+        game.player.movement = 3;
+    } else if (game.keyboardMap[39] || game.player.touchMovement == 4) {
+        game.player.movement = 4;
     } else {
-        player.movement = 0;
+        game.player.movement = 0;
     }
 
     // send player movement requests
-    if (player.movement) {
+    if (game.player.movement) {
         const arraybuffer = new ArrayBuffer(2);
         const dataview = new DataView(arraybuffer);
         dataview.setUint8(0, 3);
-        dataview.setUint8(1, player.movement);
+        dataview.setUint8(1, game.player.movement);
         websocket.send(dataview);
     }
-}, 1000 / 20);
+}, game.clientNetworkPulseRate);
 
 function lerp(start, end, time) {
     return start * (1 - time) + end * time;
@@ -340,78 +361,77 @@ function lerp(start, end, time) {
 let lastUpdateTime = Date.now();
 setInterval(() => {
     const deltaTime = Date.now() - lastUpdateTime;
-    const lerpTime = 60;
 
-    if (session_started) {
+    if (game.session_started) {
         // player orientations
-        if (deltaTime <= lerpTime) { // lerp
-            player_list.forEach(player_object => {
-                player_object.mesh.position.x = lerp(player_object.mesh.position.x, player_object.x, deltaTime / lerpTime);
-                player_object.mesh.position.z = lerp(player_object.mesh.position.z, player_object.z, deltaTime / lerpTime);
+        if (deltaTime <= game.lerpFactor) { // lerp
+            game.characters.forEach(character => {
+                character.mesh.position.x = lerp(character.mesh.position.x, character.x, deltaTime / game.lerpFactor);
+                character.mesh.position.z = lerp(character.mesh.position.z, character.z, deltaTime / game.lerpFactor);
 
-                player_object.mesh.rotation.y = player_object.eulerY; // do not lerp the direction
+                character.mesh.rotation.y = character.eulerY; // do not lerp the direction
             });
         } else { // don't lerp
-            player_list.forEach(player_object => {
-                player_object.mesh.position.x = player_object.x;
-                player_object.mesh.position.z = player_object.z;
+            game.characters.forEach(character => {
+                character.mesh.position.x = character.x;
+                character.mesh.position.z = character.z;
 
-                player_object.mesh.rotation.y = player_object.eulerY;
+                character.mesh.rotation.y = character.eulerY;
             });
         }
 
         // projectile particle systems movement
-        projectile_list.forEach(projectile => {
+        game.projectiles.forEach(projectile => {
             projectile.particleSystem.emitter.x += Math.sin(projectile.forwardVector) * projectile.speed;
             projectile.particleSystem.emitter.z += Math.cos(projectile.forwardVector) * projectile.speed;
         });
     }
 
     lastUpdateTime = Date.now();
-}, 1000 / 30);
+}, game.physicsTickRate);
 
 // mostly for game logic and animation stuff
 scene.registerBeforeRender(function () {
-    if (session_started) {
-        camera.position.x = player.mesh.position.x;
-        camera.position.y = player.mesh.position.y + 25;
-        camera.position.z = player.mesh.position.z - 25;
+    if (game.session_started) {
+        camera.position.x = game.player.mesh.position.x;
+        camera.position.y = game.player.mesh.position.y + 25;
+        camera.position.z = game.player.mesh.position.z - 25;
 
         // remove expired projectiles on the client side
-        projectile_list.forEach(projectile => {
+        game.projectiles.forEach(projectile => {
             if (Date.now() - projectile.creationTime > 10000) {
                 projectile.particleSystem.stop();
-                projectile_list.splice(projectile_list.indexOf(projectile), 1);
+                game.projectiles.splice(game.projectiles.indexOf(projectile), 1);
             }
         });
 
         // movement animations
-        player_list.forEach(player_object => {
-            if (player_object.mesh.previousX != player_object.mesh.position.x || player_object.mesh.previousZ != player_object.mesh.position.z) {
-                if (!player_object.mesh.walkRange.isRunning) {
-                    player_object.mesh.walkRange.isRunning = true;
-                    player_object.mesh.idleRange.isRunning = false;
-                    player_object.mesh.idleRange.animation.stop();
-                    player_object.mesh.walkRange.animation = scene.beginAnimation(player_object.mesh.skeleton, player_object.mesh.walkRange.from, player_object.mesh.walkRange.to, true, 1);
+        game.characters.forEach(character => {
+            if (character.mesh.previousX != character.mesh.position.x || character.mesh.previousZ != character.mesh.position.z) {
+                if (!character.mesh.walkRange.isRunning) {
+                    character.mesh.walkRange.isRunning = true;
+                    character.mesh.idleRange.isRunning = false;
+                    character.mesh.idleRange.animation.stop();
+                    character.mesh.walkRange.animation = scene.beginAnimation(character.mesh.skeleton, character.mesh.walkRange.from, character.mesh.walkRange.to, true, 1);
                 }
             } else {
-                if (!player_object.mesh.idleRange.isRunning) {
-                    player_object.mesh.idleRange.isRunning = true;
-                    player_object.mesh.walkRange.isRunning = false;
-                    if (player_object.mesh.walkRange.animation)
-                        player_object.mesh.walkRange.animation.stop();
-                    player_object.mesh.idleRange.animation = scene.beginAnimation(player_object.mesh.skeleton, player_object.mesh.idleRange.from, player_object.mesh.idleRange.to, true, 1);
+                if (!character.mesh.idleRange.isRunning) {
+                    character.mesh.idleRange.isRunning = true;
+                    character.mesh.walkRange.isRunning = false;
+                    if (character.mesh.walkRange.animation)
+                        character.mesh.walkRange.animation.stop();
+                    character.mesh.idleRange.animation = scene.beginAnimation(character.mesh.skeleton, character.mesh.idleRange.from, character.mesh.idleRange.to, true, 1);
                 }
             }
 
             const deltaTime = engine.getDeltaTime();
             const lerpFactor = 40;
             if (deltaTime <= lerpFactor) {
-                player_object.mesh.previousX = lerp(player_object.mesh.previousX, player_object.mesh.position.x, deltaTime / lerpFactor);
-                player_object.mesh.previousZ = lerp(player_object.mesh.previousZ, player_object.mesh.position.z, deltaTime / lerpFactor);
+                character.mesh.previousX = lerp(character.mesh.previousX, character.mesh.position.x, deltaTime / lerpFactor);
+                character.mesh.previousZ = lerp(character.mesh.previousZ, character.mesh.position.z, deltaTime / lerpFactor);
             } else {
-                player_object.mesh.previousX = player_object.mesh.position.x;
-                player_object.mesh.previousZ = player_object.mesh.position.z;
+                character.mesh.previousX = character.mesh.position.x;
+                character.mesh.previousZ = character.mesh.position.z;
             }
         });
     }
