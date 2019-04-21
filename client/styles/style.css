@@ -25,10 +25,23 @@ html, body {
     align-items: center;
 }
 
+.touch-screen {
+    opacity: 0.7;
+}
+
 .virtualDPad {
     left: 20px;
     bottom: 20px;
     height: 40%;
     width: 32%;
-    opacity: 0.7;
+}
+
+.ability-button {
+    right: 40px;
+    bottom: 50px;
+    width: 20%;
+    height: 30%;
+    border: 2px solid white;
+    border-radius: 50%;
+    background-color: rgba(119, 112, 128, 0.3);
 }

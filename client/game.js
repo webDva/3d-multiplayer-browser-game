@@ -239,6 +239,8 @@ websocket.onmessage = (event) => {
 }
 
 // display DOM user interface
+
+// virtual d-pad
 const virtualDPad = document.getElementById('virtualDPad');
 virtualDPad.style.display = 'block';
 document.getElementById('virtualDPad-image').style.display = 'block';
@@ -293,9 +295,17 @@ virtualDPad.onpointerup = virtualDPad.onpointerout = function () {
     game.player.touchMovement = 0;
 };
 
-// open the WebSocket connection
-websocket.onopen = () => {
-    websocket.send(JSON.stringify({ type: 'join' }));
+// ability button
+const abilityButton = document.getElementById('ability-button');
+abilityButton.style.display = 'block';
+document.getElementById('ability-button-image').style.display = 'block';
+
+abilityButton.onpointerdown = function (event) {
+    game.keyboardMap['W'.charCodeAt()] = true;
+};
+
+abilityButton.onpointerup = function (event) {
+    game.keyboardMap['W'.charCodeAt()] = false;
 };
 
 document.addEventListener('keydown', game.keyboardHandler.bind(game));
@@ -315,10 +325,15 @@ document.addEventListener('keydown', function (event) {
     }
 });
 
+// open the WebSocket connection
+websocket.onopen = () => {
+    websocket.send(JSON.stringify({ type: 'join' }));
+};
+
 // client network update pulse
 setInterval(() => {
     // player wants to attack
-    if (game.keyboardMap['1'.charCodeAt()]) {
+    if (game.keyboardMap['W'.charCodeAt()]) {
         const arraybuffer = new ArrayBuffer(1);
         const dataview = new DataView(arraybuffer);
         dataview.setUint8(0, 2);
