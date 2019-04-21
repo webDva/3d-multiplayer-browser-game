@@ -19,29 +19,24 @@ class Game {
 
     create_character(id, x, z, angle, type) {
         const self = this;
-        BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'circle2.babylon', scene).then(function (imported) {
+        BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'cutie.babylon', scene).then(function (imported) {
             const mesh = imported.meshes[0];
             mesh.material = new BABYLON.StandardMaterial('', scene);
             mesh.material.diffuseColor = BABYLON.Color3.Blue();
+            // eye color
+            imported.meshes[1].material.diffuseColor = BABYLON.Color3.Green();
 
             if (type === 0) { // if an NPC
                 mesh.material.diffuseColor = BABYLON.Color3.Red();
             }
-
-            // add weapon and attach it
-            BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'staff.babylon', scene).then(function (meshes) {
-                const weaponMesh = meshes.meshes[0];
-                weaponMesh.attachToBone(mesh.skeleton.bones[mesh.skeleton.getBoneIndexByName('WeaponGrip')], mesh);
-            });
 
             // animation
             mesh.skeleton.animationPropertiesOverride = new BABYLON.AnimationPropertiesOverride();
             mesh.skeleton.animationPropertiesOverride.enableBlending = true;
             mesh.skeleton.animationPropertiesOverride.blendingSpeed = 0.2;
             mesh.skeleton.animationPropertiesOverride.loopMode = 1;
-            mesh.idleRange = mesh.skeleton.getAnimationRange('IdleAnimation');
-            mesh.walkRange = mesh.skeleton.getAnimationRange('Walk');
-            mesh.idleRange.animation = scene.beginAnimation(mesh.skeleton, mesh.idleRange.from, mesh.idleRange.to, true, 0.5);
+            mesh.idleRange = mesh.skeleton.getAnimationRange('Idle');
+            mesh.idleRange.animation = scene.beginAnimation(mesh.skeleton, mesh.idleRange.from, mesh.idleRange.to, true, 1);
 
             mesh.KGAME_TYPE = 1; // KGAME_TYPE 1 means that it is a kawaii game mesh of type 1
             const character_struct = {
@@ -406,34 +401,34 @@ scene.registerBeforeRender(function () {
         });
 
         // movement animations
-        game.characters.forEach(character => {
-            if (character.mesh.previousX != character.mesh.position.x || character.mesh.previousZ != character.mesh.position.z) {
-                if (!character.mesh.walkRange.isRunning) {
-                    character.mesh.walkRange.isRunning = true;
-                    character.mesh.idleRange.isRunning = false;
-                    character.mesh.idleRange.animation.stop();
-                    character.mesh.walkRange.animation = scene.beginAnimation(character.mesh.skeleton, character.mesh.walkRange.from, character.mesh.walkRange.to, true, 1);
-                }
-            } else {
-                if (!character.mesh.idleRange.isRunning) {
-                    character.mesh.idleRange.isRunning = true;
-                    character.mesh.walkRange.isRunning = false;
-                    if (character.mesh.walkRange.animation)
-                        character.mesh.walkRange.animation.stop();
-                    character.mesh.idleRange.animation = scene.beginAnimation(character.mesh.skeleton, character.mesh.idleRange.from, character.mesh.idleRange.to, true, 1);
-                }
-            }
+        // game.characters.forEach(character => {
+        //     if (character.mesh.previousX != character.mesh.position.x || character.mesh.previousZ != character.mesh.position.z) {
+        //         if (!character.mesh.walkRange.isRunning) {
+        //             character.mesh.walkRange.isRunning = true;
+        //             character.mesh.idleRange.isRunning = false;
+        //             character.mesh.idleRange.animation.stop();
+        //             character.mesh.walkRange.animation = scene.beginAnimation(character.mesh.skeleton, character.mesh.walkRange.from, character.mesh.walkRange.to, true, 1);
+        //         }
+        //     } else {
+        //         if (!character.mesh.idleRange.isRunning) {
+        //             character.mesh.idleRange.isRunning = true;
+        //             character.mesh.walkRange.isRunning = false;
+        //             if (character.mesh.walkRange.animation)
+        //                 character.mesh.walkRange.animation.stop();
+        //             character.mesh.idleRange.animation = scene.beginAnimation(character.mesh.skeleton, character.mesh.idleRange.from, character.mesh.idleRange.to, true, 1);
+        //         }
+        //     }
 
-            const deltaTime = engine.getDeltaTime();
-            const lerpFactor = 40;
-            if (deltaTime <= lerpFactor) {
-                character.mesh.previousX = lerp(character.mesh.previousX, character.mesh.position.x, deltaTime / lerpFactor);
-                character.mesh.previousZ = lerp(character.mesh.previousZ, character.mesh.position.z, deltaTime / lerpFactor);
-            } else {
-                character.mesh.previousX = character.mesh.position.x;
-                character.mesh.previousZ = character.mesh.position.z;
-            }
-        });
+        //     const deltaTime = engine.getDeltaTime();
+        //     const lerpFactor = 40;
+        //     if (deltaTime <= lerpFactor) {
+        //         character.mesh.previousX = lerp(character.mesh.previousX, character.mesh.position.x, deltaTime / lerpFactor);
+        //         character.mesh.previousZ = lerp(character.mesh.previousZ, character.mesh.position.z, deltaTime / lerpFactor);
+        //     } else {
+        //         character.mesh.previousX = character.mesh.position.x;
+        //         character.mesh.previousZ = character.mesh.position.z;
+        //     }
+        // });
     }
 });
 
