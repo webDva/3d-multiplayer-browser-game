@@ -240,10 +240,62 @@ websocket.onmessage = (event) => {
 
 // display DOM user interface
 
-// virtual d-pad
-const virtualDPad = document.getElementById('virtualDPad');
-virtualDPad.style.display = 'block';
-document.getElementById('virtualDPad-image').style.display = 'block';
+if (game.isTouchScreen) {
+    displayOnscreenControls();
+}
+
+function displayOnscreenControls() {
+    // virtual d-pad
+    const virtualDPad = document.getElementById('virtualDPad');
+    virtualDPad.style.display = 'block';
+    document.getElementById('virtualDPad-image').style.display = 'block';
+
+    virtualDPad.onpointerdown = virtualDPad.onpointermove = function (event) {
+        const bounds = event.target.getBoundingClientRect();
+
+        // vertices coordinates
+        const upperLeft = { x: bounds.left, y: bounds.top };
+        const lowerLeft = { x: bounds.left, y: bounds.top + bounds.height };
+        const upperRight = { x: bounds.left + bounds.width, y: bounds.top };
+        const lowerRight = { x: bounds.left + bounds.width, y: bounds.top + bounds.height };
+        const middle = { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 };
+
+        // triangle coordinates
+        const leftTriangle = { v1: upperLeft, v2: lowerLeft, v3: middle };
+        const upTriangle = { v1: upperLeft, v2: upperRight, v3: middle };
+        const rightTriangle = { v1: upperRight, v2: lowerRight, v3: middle };
+        const downTriangle = { v1: lowerLeft, v2: lowerRight, v3: middle };
+
+        const touchPoint = { x: event.clientX, y: event.clientY };
+
+        if (pointInTriangle(touchPoint, upTriangle.v1, upTriangle.v2, upTriangle.v3)) {
+            game.player.touchMovement = 1;
+        } else if (pointInTriangle(touchPoint, leftTriangle.v1, leftTriangle.v2, leftTriangle.v3)) {
+            game.player.touchMovement = 2;
+        } else if (pointInTriangle(touchPoint, downTriangle.v1, downTriangle.v2, downTriangle.v3)) {
+            game.player.touchMovement = 3;
+        } else if (pointInTriangle(touchPoint, rightTriangle.v1, rightTriangle.v2, rightTriangle.v3)) {
+            game.player.touchMovement = 4;
+        }
+    };
+
+    virtualDPad.onpointerup = virtualDPad.onpointerout = function () {
+        game.player.touchMovement = 0;
+    };
+
+    // ability button
+    const abilityButton = document.getElementById('ability-button');
+    abilityButton.style.display = 'block';
+    document.getElementById('ability-button-image').style.display = 'block';
+
+    abilityButton.onpointerdown = function (event) {
+        game.keyboardMap['W'.charCodeAt()] = true;
+    };
+
+    abilityButton.onpointerup = function (event) {
+        game.keyboardMap['W'.charCodeAt()] = false;
+    };
+}
 
 function areaTriangle(v1, v2, v3) {
     return Math.abs((v1.x * (v2.y - v3.y) + v2.x * (v3.y - v1.y) + v3.x * (v1.y - v2.y)) / 2);
@@ -261,52 +313,6 @@ function pointInTriangle(p, v1, v2, v3) {
         return false;
     }
 }
-
-virtualDPad.onpointerdown = virtualDPad.onpointermove = function (event) {
-    const bounds = event.target.getBoundingClientRect();
-
-    // vertices coordinates
-    const upperLeft = { x: bounds.left, y: bounds.top };
-    const lowerLeft = { x: bounds.left, y: bounds.top + bounds.height };
-    const upperRight = { x: bounds.left + bounds.width, y: bounds.top };
-    const lowerRight = { x: bounds.left + bounds.width, y: bounds.top + bounds.height };
-    const middle = { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 };
-
-    // triangle coordinates
-    const leftTriangle = { v1: upperLeft, v2: lowerLeft, v3: middle };
-    const upTriangle = { v1: upperLeft, v2: upperRight, v3: middle };
-    const rightTriangle = { v1: upperRight, v2: lowerRight, v3: middle };
-    const downTriangle = { v1: lowerLeft, v2: lowerRight, v3: middle };
-
-    const touchPoint = { x: event.clientX, y: event.clientY };
-
-    if (pointInTriangle(touchPoint, upTriangle.v1, upTriangle.v2, upTriangle.v3)) {
-        game.player.touchMovement = 1;
-    } else if (pointInTriangle(touchPoint, leftTriangle.v1, leftTriangle.v2, leftTriangle.v3)) {
-        game.player.touchMovement = 2;
-    } else if (pointInTriangle(touchPoint, downTriangle.v1, downTriangle.v2, downTriangle.v3)) {
-        game.player.touchMovement = 3;
-    } else if (pointInTriangle(touchPoint, rightTriangle.v1, rightTriangle.v2, rightTriangle.v3)) {
-        game.player.touchMovement = 4;
-    }
-};
-
-virtualDPad.onpointerup = virtualDPad.onpointerout = function () {
-    game.player.touchMovement = 0;
-};
-
-// ability button
-const abilityButton = document.getElementById('ability-button');
-abilityButton.style.display = 'block';
-document.getElementById('ability-button-image').style.display = 'block';
-
-abilityButton.onpointerdown = function (event) {
-    game.keyboardMap['W'.charCodeAt()] = true;
-};
-
-abilityButton.onpointerup = function (event) {
-    game.keyboardMap['W'.charCodeAt()] = false;
-};
 
 document.addEventListener('keydown', game.keyboardHandler.bind(game));
 document.addEventListener('keyup', game.keyboardHandler.bind(game));
