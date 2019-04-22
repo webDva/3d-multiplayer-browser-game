@@ -54,8 +54,8 @@ if (env.production) {
 
 const config = {
     PORT: 3000,
-    networkUpdatePulseRate: 1000 / 10,
-    physicsTickRate: 1000 / 15,
+    networkUpdatePulseRate: 1000 / 5,
+    physicsTickRate: 1000 / 5,
     character: {
         defaultMovementSpeed: 1,
         collisionBoxSize: 3 // a square
@@ -508,7 +508,7 @@ class NPC extends Character {
 
         this.aggroTable = []; // a list of player-aggro pairs (.player and .aggro object names)
         this.aggroRadius = 10;
-        this.movement_speed = 0.1;
+        this.movement_speed = 0.9;
 
         this.leashLocation = { x: this.x, z: this.z };
         this.leashRadius = 40;
@@ -576,7 +576,7 @@ class NPC extends Character {
                 this.isReseting = false;
 
                 // have to find a way to organize this for specific mobs
-                this.movement_speed = 0.1;
+                this.movement_speed = 0.9;
                 this.health = 100;
             }
         }
