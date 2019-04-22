@@ -57,11 +57,48 @@ class Game {
             mesh.previousX = x;
             mesh.previousZ = z;
 
+            // health bar above character's head
+
+            const healthBarContainerMaterial = new BABYLON.StandardMaterial('', scene);
+            healthBarContainerMaterial.emissiveColor = BABYLON.Color3.Black();
+            healthBarContainerMaterial.diffuseColor = BABYLON.Color3.Black();
+            healthBarContainerMaterial.specularColor = BABYLON.Color3.Black();
+            healthBarContainerMaterial.backFaceCulling = false;
+
+            const healthBarChildMaterial = new BABYLON.StandardMaterial('', scene);
+            healthBarChildMaterial.emissiveColor = BABYLON.Color3.Red();
+            healthBarChildMaterial.diffuseColor = BABYLON.Color3.Black();
+            healthBarChildMaterial.specularColor = BABYLON.Color3.Black();
+            healthBarChildMaterial.backFaceCulling = false;
+
+            const healthbarContainer = BABYLON.MeshBuilder.CreatePlane('', { width: 5, height: 1, subdivisions: 4 }, scene);
+            const healthbarChild = BABYLON.MeshBuilder.CreatePlane('', { width: 5, height: 1, subdivisions: 4 }, scene);
+
+            healthbarContainer.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+
+            healthbarChild.renderingGroupId = 1;
+            healthbarContainer.renderingGroupId = 1;
+
+            healthbarChild.position.z = -0.01;
+            healthbarContainer.position.y = 5;
+
+            healthbarContainer.parent = mesh;
+            healthbarChild.parent = healthbarContainer;
+
+            healthbarChild.material = healthBarChildMaterial;
+            healthbarContainer.material = healthBarContainerMaterial;
+
+            mesh.healthbar = healthbarContainer;
+
+            // if this is the player's character
+
             if (self.player.id === id) {
                 self.player.mesh = mesh;
                 self.player.struct = character_struct;
                 camera.lockedTarget = self.player.mesh;
                 inventoryCamera.target = self.player.mesh;
+
+                healthBarChildMaterial.emissiveColor = BABYLON.Color3.Green();
 
                 self.session_started = true;
             }
@@ -192,7 +229,7 @@ websocket.onmessage = (event) => {
             const mobID = dataview.getUint32(1);
             const mob_character = game.characters.find(character => character.id === mobID);
             const aggroIcon = new BABYLON.Sprite('aggroIcon', aggroIconSpriteManager);
-            aggroIcon.position = new BABYLON.Vector3(mob_character.mesh.position.x, 5, mob_character.mesh.position.z);
+            aggroIcon.position = new BABYLON.Vector3(mob_character.mesh.position.x, 7, mob_character.mesh.position.z);
             setTimeout(function () {
                 aggroIcon.dispose();
             }, 1000);
@@ -419,6 +456,13 @@ scene.registerBeforeRender(function () {
                 projectile.particleSystem.stop();
                 game.projectiles.splice(game.projectiles.indexOf(projectile), 1);
             }
+        });
+
+        // character health bars
+        game.characters.forEach(character => {
+            const healthbar = character.mesh.healthbar.getChildren()[0];
+            healthbar.scaling.x = character.health / 100;
+            healthbar.position.x = (1 - (character.health / 100)) * -5 / 2;
         });
 
         // movement animations

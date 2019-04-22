@@ -241,19 +241,18 @@ ws_server.on('connection', websocket => {
                 const player = websocket.player;
                 if (player.isAlive) {
                     const projectile = {
-                        position: {
-                            x: player.x,
-                            z: player.z,
-                        },
+                        x: player.x,
+                        z: player.z,
                         angle: player.angle,
                         speed: 3,
                         creationTime: Date.now(),
-                        owner: player.id
+                        owner: player.id,
+                        collisionBoxSize: 3
                     };
                     game.projectiles.push(projectile);
                     game.addDelayedBroadcast(createBinaryFrame(5, [
-                        { type: 'Float32', value: projectile.position.x },
-                        { type: 'Float32', value: projectile.position.z },
+                        { type: 'Float32', value: projectile.x },
+                        { type: 'Float32', value: projectile.z },
                         { type: 'Float32', value: projectile.angle },
                         { type: 'Float32', value: projectile.speed },
                         { type: 'Uint32', value: projectile.owner }
@@ -308,8 +307,8 @@ class Game {
     physicsLoop() {
         // projectile movement
         this.projectiles.forEach(projectile => {
-            projectile.position.x += Math.sin(projectile.angle) * projectile.speed;
-            projectile.position.z += Math.cos(projectile.angle) * projectile.speed;
+            projectile.x += Math.sin(projectile.angle) * projectile.speed;
+            projectile.z += Math.cos(projectile.angle) * projectile.speed;
         });
 
         // player and NPC movement
@@ -358,13 +357,13 @@ class Game {
 
         // projectile-player collisions
         this.projectiles.forEach(projectile => {
-            this.characters.filter(character => {
-                if (projectile.owner !== character.id && character.isAlive === true) return true;
-            })
-                .forEach(character => {
-                    // no collision for now
-                    //this.projectiles.splice(this.projectiles.indexOf(projectile), 1);
-                });
+            this.characters.forEach(character => {
+                if (projectile.owner !== character.id && character.isAlive === true && AABBCollision(projectile, character)) {
+                    character.health -= 1;
+
+                    this.projectiles.splice(this.projectiles.indexOf(projectile), 1);
+                }
+            });
         });
 
         // NPC loop
@@ -610,16 +609,11 @@ function pointInCircleCollision(point, circle, circleRadius) {
  * @param {*} a The first object to check for. Must have `.x`, `.z`, and `.collisionBoxSize` members. Can have an extension for collision prediction with the parameter `a_extension`.
  * @param {*} b The second object to check for. Must have `.x`, `.z`, and `.collisionBoxSize` members.
  * @param {*} a_extension Used for predictions. Must have `.x` and `.z` members. If the axis has no extension, then it should be `0`.
+ * @return `true` if collison has been detected, `false` otherwise.
  */
 function AABBCollision(a, b, a_extension = { x: 0, z: 0 }) {
-    if (a.x - (a.collisionBoxSize / 2) + a_extension.x < b.x - (b.collisionBoxSize / 2) &&
-        a.x + (a.collisionBoxSize / 2) + a_extension.x > b.x - (b.collisionBoxSize / 2) &&
-        a.z - (a.collisionBoxSize / 2) + a_extension.z < b.z - (b.collisionBoxSize / 2) &&
-        a.z + (a.collisionBoxSize / 2) + a_extension.z > b.z - (b.collisionBoxSize / 2)) {
-        return true;
-    } else {
-        return false;
-    }
+    return (a.x - (a.collisionBoxSize / 2) + a_extension.x <= b.x + (b.collisionBoxSize / 2) && a.x + (a.collisionBoxSize / 2) + a_extension.x >= b.x - (b.collisionBoxSize / 2)) &&
+        (a.z - (a.collisionBoxSize / 2) + a_extension.z <= b.z + (b.collisionBoxSize / 2) && a.z + (a.collisionBoxSize / 2) + a_extension.z >= b.z - (b.collisionBoxSize / 2));
 }
 
 const game = new Game();
