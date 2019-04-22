@@ -71,7 +71,7 @@ class Game {
             healthBarChildMaterial.specularColor = BABYLON.Color3.Black();
             healthBarChildMaterial.backFaceCulling = false;
 
-            const healthbarContainer = BABYLON.MeshBuilder.CreatePlane('', { width: 5, height: 1, subdivisions: 4 }, scene);
+            const healthbarContainer = BABYLON.MeshBuilder.CreatePlane('', { width: 5.2, height: 1.2, subdivisions: 4 }, scene);
             const healthbarChild = BABYLON.MeshBuilder.CreatePlane('', { width: 5, height: 1, subdivisions: 4 }, scene);
 
             healthbarContainer.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
@@ -228,11 +228,13 @@ websocket.onmessage = (event) => {
         if (dataview.getUint8(0) === 2) {
             const mobID = dataview.getUint32(1);
             const mob_character = game.characters.find(character => character.id === mobID);
-            const aggroIcon = new BABYLON.Sprite('aggroIcon', aggroIconSpriteManager);
-            aggroIcon.position = new BABYLON.Vector3(mob_character.mesh.position.x, 7, mob_character.mesh.position.z);
-            setTimeout(function () {
-                aggroIcon.dispose();
-            }, 1000);
+            if (mob_character) {
+                const aggroIcon = new BABYLON.Sprite('aggroIcon', aggroIconSpriteManager);
+                aggroIcon.position = new BABYLON.Vector3(mob_character.mesh.position.x, 7, mob_character.mesh.position.z);
+                setTimeout(function () {
+                    aggroIcon.dispose();
+                }, 1000);
+            }
         }
 
         // a new character arrives on the server
