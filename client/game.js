@@ -9,9 +9,9 @@ class Game {
 
         this.mapSize = 50;
 
-        this.clientNetworkPulseRate = 1000 / 20;
-        this.physicsTickRate = 1000 / 30;
-        this.lerpFactor = 60;
+        this.clientNetworkPulseRate = 1000 / 10;
+        this.physicsTickRate = 1000 / 15;
+        this.lerpFactor = 100;
 
         this.keyboardMap = {};
         this.isTouchScreen = 'ontouchstart' in document.documentElement || (window.navigator.maxTouchPoints && window.navigator.maxTouchPoints >= 1);

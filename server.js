@@ -55,7 +55,7 @@ if (env.production) {
 const config = {
     PORT: 3000,
     networkUpdatePulseRate: 1000 / 10,
-    physicsTickRate: 1000 / 30,
+    physicsTickRate: 1000 / 15,
     character: {
         defaultMovementSpeed: 1,
         collisionBoxSize: 3 // a square
