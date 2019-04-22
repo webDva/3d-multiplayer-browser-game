@@ -255,8 +255,10 @@ websocket.onmessage = (event) => {
         if (dataview.getUint8(0) === 6) {
             // player objects can be duplicated too,so this would actually need an array from Array.filter
             const character = game.characters.find(character => character.id === dataview.getUint32(1));
-            character.mesh.dispose();
-            game.characters.splice(game.characters.indexOf(character), 1);
+            if (character) {
+                character.mesh.dispose();
+                game.characters.splice(game.characters.indexOf(character), 1);
+            }
         }
 
         // character healths update

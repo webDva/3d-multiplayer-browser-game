@@ -37,13 +37,6 @@ class Client {
                 dataview.setUint8(1, Math.floor(Math.random() * (4 - 1 + 1) + 1));
                 this.websocket.send(dataview);
 
-                // face in a random direction
-                arraybuffer = new ArrayBuffer(5);
-                dataview = new DataView(arraybuffer);
-                dataview.setUint8(0, 1);
-                dataview.setFloat32(1, Math.random() * (Math.PI * 2 - -Math.PI * 2) + -Math.PI * 2);
-                this.websocket.send(dataview);
-
                 // shoot
                 arraybuffer = new ArrayBuffer(1);
                 dataview = new DataView(arraybuffer);
