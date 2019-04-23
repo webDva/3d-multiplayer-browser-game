@@ -36,12 +36,24 @@ html, body {
     width: 32%;
 }
 
-.ability-button {
-    right: 40px;
-    bottom: 50px;
-    width: 20%;
+#attack-buttons-container {
+    right: 20px;
+    bottom: 30px;
+    width: 30%;
     height: 30%;
-    border: 2px solid white;
-    border-radius: 50%;
-    background-color: rgba(119, 112, 128, 0.3);
+}
+
+.attack-button {
+    position: absolute;
+    width: 50%;
+    height: 50%;
+}
+
+.a-button {
+    left: 0;
+    bottom: 0;
+}
+
+.b-button {
+    right: 0;
 }

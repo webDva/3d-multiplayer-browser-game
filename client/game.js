@@ -323,17 +323,28 @@ function displayOnscreenControls() {
         game.player.touchMovement = 0;
     };
 
-    // ability button
-    const abilityButton = document.getElementById('ability-button');
-    abilityButton.style.display = 'block';
-    document.getElementById('ability-button-image').style.display = 'block';
+    // attack buttons
 
-    abilityButton.onpointerdown = function (event) {
+    document.getElementById('attack-buttons-container').style.display = 'block';
+
+    const aButton = document.getElementById('a-button');
+
+    aButton.onpointerdown = function (event) {
         game.keyboardMap['W'.charCodeAt()] = true;
     };
 
-    abilityButton.onpointerup = function (event) {
+    aButton.onpointerup = function (event) {
         game.keyboardMap['W'.charCodeAt()] = false;
+    };
+
+    const bButton = document.getElementById('b-button');
+
+    bButton.onpointerdown = function (event) {
+        game.keyboardMap['E'.charCodeAt()] = true;
+    };
+
+    bButton.onpointerup = function (event) {
+        game.keyboardMap['E'.charCodeAt()] = false;
     };
 }
 

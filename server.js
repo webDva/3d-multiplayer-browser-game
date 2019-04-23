@@ -586,6 +586,10 @@ class NPC extends Character {
 class Player extends Character {
     constructor(game) {
         super(game, true);
+
+        this.level = 1;
+        this.experience_points = 0;
+        this.score = 0;
     }
 }
 
