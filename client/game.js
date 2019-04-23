@@ -21,13 +21,12 @@ class Game {
         const self = this;
         BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'cutie.babylon', scene).then(function (imported) {
             const mesh = imported.meshes[0];
-            mesh.material = new BABYLON.StandardMaterial('', scene);
-            mesh.material.diffuseColor = BABYLON.Color3.Blue();
-            // eye color
-            imported.meshes[1].material.diffuseColor = BABYLON.Color3.Green();
 
             if (type === 0) { // if an NPC
-                mesh.material.diffuseColor = BABYLON.Color3.Red();
+                mesh.material.subMaterials[0].diffuseColor = BABYLON.Color3.Red();
+                mesh.material.subMaterials[1].diffuseColor = BABYLON.Color3.Yellow();
+            } else {
+                mesh.material.subMaterials[0].diffuseColor = BABYLON.Color3.Blue();
             }
 
             // animation
