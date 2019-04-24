@@ -11,7 +11,8 @@ class Game {
 
         this.clientNetworkPulseRate = 1000 / 15;
         this.physicsTickRate = 1000 / 15;
-        this.lerpFactor = 100;
+        this.physicsLerpFactor = 100;
+        this.graphicsLerpFactor = 100;
 
         this.keyboardMap = {};
         this.isTouchScreen = 'ontouchstart' in document.documentElement || (window.navigator.maxTouchPoints && window.navigator.maxTouchPoints >= 1);
@@ -151,8 +152,8 @@ const groundSize = game.mapSize;
 const ground = BABYLON.Mesh.CreateGround("ground", groundSize, groundSize, 1, scene);
 ground.setPivotMatrix(BABYLON.Matrix.Translation(groundSize / 2, 0, groundSize / 2), false);
 ground.material = new BABYLON.GridMaterial('groundMaterial', scene);
-ground.material.mainColor = new BABYLON.Color3(0.75, 0.75, 0.75);
-ground.material.lineColor = new BABYLON.Color3(0.5, 0.5, 0.5);
+ground.material.mainColor = new BABYLON.Color3(0.12, 0.56, 1);
+ground.material.lineColor = new BABYLON.Color3(1, 1, 1);
 ground.material.gridRatio = 1;
 ground.material.majorUnitFrequency = 2;
 
@@ -431,10 +432,10 @@ setInterval(() => {
 
     if (game.session_started) {
         // player orientations
-        if (deltaTime <= game.lerpFactor) { // lerp
+        if (deltaTime <= game.physicsLerpFactor) { // lerp
             game.characters.forEach(character => {
-                character.mesh.position.x = lerp(character.mesh.position.x, character.x, deltaTime / game.lerpFactor);
-                character.mesh.position.z = lerp(character.mesh.position.z, character.z, deltaTime / game.lerpFactor);
+                character.mesh.position.x = lerp(character.mesh.position.x, character.x, deltaTime / game.physicsLerpFactor);
+                character.mesh.position.z = lerp(character.mesh.position.z, character.z, deltaTime / game.physicsLerpFactor);
 
                 character.mesh.rotation.y = character.eulerY; // do not lerp the direction
             });
