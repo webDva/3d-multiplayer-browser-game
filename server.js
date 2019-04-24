@@ -54,8 +54,8 @@ if (env.production) {
 
 const config = {
     PORT: 3000,
-    networkUpdatePulseRate: 1000 / 5,
-    physicsTickRate: 1000 / 5,
+    networkUpdatePulseRate: 1000 / 15,
+    physicsTickRate: 1000 / 15,
     character: {
         defaultMovementSpeed: 1,
         collisionBoxSize: 3 // a square
@@ -446,7 +446,9 @@ class Character {
         this.isAlive = true;
         this.deathTime = 0;
 
-        this.combat = {}; // cooldowns, etc.   
+        this.combat = {}; // cooldowns, etc.
+
+        this.level = 1;
 
         game.characters.push(this);
     }
@@ -587,8 +589,6 @@ class Player extends Character {
     constructor(game) {
         super(game, true);
 
-        this.level = 1;
-        this.experience_points = 0;
         this.score = 0;
     }
 }
