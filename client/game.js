@@ -392,9 +392,10 @@ websocket.onopen = () => {
 setInterval(() => {
     // player wants to attack
     if (game.keyboardMap['W'.charCodeAt()]) {
-        const arraybuffer = new ArrayBuffer(1);
+        const arraybuffer = new ArrayBuffer(2);
         const dataview = new DataView(arraybuffer);
         dataview.setUint8(0, 2);
+        dataview.setUint8(1, 1);
         websocket.send(dataview);
     }
 

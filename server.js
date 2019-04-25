@@ -238,26 +238,7 @@ ws_server.on('connection', websocket => {
 
             // player wants to shoot a projectile
             if (client_dataview.getUint8(0) === 2) {
-                const player = websocket.player;
-                if (player.isAlive) {
-                    const projectile = {
-                        x: player.x,
-                        z: player.z,
-                        angle: player.angle,
-                        speed: 3,
-                        creationTime: Date.now(),
-                        owner: player.id,
-                        collisionBoxSize: 3
-                    };
-                    game.projectiles.push(projectile);
-                    game.addDelayedBroadcast(createBinaryFrame(5, [
-                        { type: 'Float32', value: projectile.x },
-                        { type: 'Float32', value: projectile.z },
-                        { type: 'Float32', value: projectile.angle },
-                        { type: 'Float32', value: projectile.speed },
-                        { type: 'Uint32', value: projectile.owner }
-                    ]));
-                }
+                websocket.player.attack(client_dataview.getUint8(1));
             }
 
             // player wants to move
@@ -297,7 +278,7 @@ class Game {
     }
 
     createHumanPlayer() {
-        return new Player(this);
+        return new Player(this, 1);
     }
 
     createNPC() {
@@ -450,6 +431,10 @@ class Character {
 
         this.level = 1;
 
+        this.stats = {
+            maxHealth: 100
+        };
+
         game.characters.push(this);
     }
 
@@ -585,11 +570,74 @@ class NPC extends Character {
     }
 }
 
+class CharacterClass {
+    constructor(player) {
+        this.number; // 1 = mage, 2 = warrior, 3 = archer
+        this.player = player;
+        this.attackA;
+        this.attackB;
+        this.stats = {};
+    }
+}
+
+class Mage extends CharacterClass {
+    constructor(player) {
+        super(player);
+
+        this.number = 1;
+        this.attackA = function () {
+            if (this.player.isAlive) {
+                const projectile = {
+                    x: this.player.x,
+                    z: this.player.z,
+                    angle: this.player.angle,
+                    speed: 3,
+                    creationTime: Date.now(),
+                    owner: this.player.id,
+                    collisionBoxSize: 1
+                };
+                this.player.game.projectiles.push(projectile);
+                this.player.game.addDelayedBroadcast(createBinaryFrame(5, [
+                    { type: 'Float32', value: projectile.x },
+                    { type: 'Float32', value: projectile.z },
+                    { type: 'Float32', value: projectile.angle },
+                    { type: 'Float32', value: projectile.speed },
+                    { type: 'Uint32', value: projectile.owner }
+                ]));
+            }
+        };
+        this.attackB = function () {
+
+        };
+        this.stats = {
+            maxHealth: 50
+        };
+        this.player.stats = this.stats;
+    }
+}
+
 class Player extends Character {
-    constructor(game) {
+    constructor(game, characterClass) { // 1 = mage, 2 = warrior, 3 = archer
         super(game, true);
 
         this.score = 0;
+        this.experiencePoints = 0;
+
+        this.class;
+        switch (characterClass) {
+            case 1:
+                this.class = new Mage(this);
+                break;
+        }
+    }
+
+    attack(number) { // 1 (A) or 2 (B)
+        switch (number) {
+            case 1:
+                return this.class.attackA();
+            case 2:
+                return this.class.attackB();
+        }
     }
 }
 
