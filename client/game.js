@@ -271,6 +271,53 @@ websocket.onmessage = (event) => {
             }
         }
 
+        if (dataview.getUint8(0) === 7) { // damage text
+            const damage = dataview.getUint32(2);
+
+            const planeSize = 2;
+            const dTSize = planeSize * 60;
+
+            const damageTextDynamicTexture = new BABYLON.DynamicTexture('', dTSize, scene);
+            damageTextDynamicTexture.hasAlpha = true;
+
+            const ctx = damageTextDynamicTexture.getContext();
+            const size = 12;
+            const fontType = 'arial';
+            ctx.font = size + 'px ' + fontType;
+            const textWidth = ctx.measureText(damage).width;
+            const ratio = textWidth / size;
+            const fontSize = Math.floor(dTSize / ratio);
+            const font = fontSize + 'px ' + fontType;
+
+            const damageTextMaterial = new BABYLON.StandardMaterial('', scene);
+            damageTextMaterial.diffuseTexture = damageTextDynamicTexture;
+            damageTextMaterial.backFaceCulling = false;
+            damageTextMaterial.diffuseColor = BABYLON.Color3.White();
+            damageTextMaterial.specularColor = BABYLON.Color3.Black();
+
+            const damageTextPlane = BABYLON.MeshBuilder.CreatePlane('', { width: planeSize, height: planeSize, subdivisions: 4 }, scene);
+            damageTextPlane.material = damageTextMaterial;
+            damageTextPlane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+
+            const animationText = new BABYLON.Animation('', 'position.y', 10, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_RELATIVE);
+            animationText.setKeys([{ frame: 0, value: 6 }, { frame: 20, value: 12 }]);
+            damageTextPlane.animations = [animationText];
+            scene.beginAnimation(damageTextPlane, 0, 20, false, 1, function () {
+                damageTextDynamicTexture.dispose();
+                damageTextPlane.dispose();
+                damageTextMaterial.dispose();
+            });
+
+            if (dataview.getUint8(1) === 0) { // damage done by the player
+                damageTextDynamicTexture.drawText(damage, null, null, font, 'yellow', null);
+                const targetId = dataview.getUint32(6);
+                damageTextPlane.parent = game.characters.find(character => character.id === targetId).mesh;
+            } else if (dataview.getUint8(1) === 1) { // damage done to the player
+                damageTextDynamicTexture.drawText(damage, null, null, font, 'red', null);
+                damageTextPlane.parent = game.player.mesh;
+            }
+        }
+
         // no player deaths for now
 
         // no player respawns either

@@ -63,7 +63,7 @@ const config = {
             maxHealth: 100,
             attack: 10,
             defense: 10,
-            crit: 0.1
+            crit: 0.01
         }
     },
     mapSize: 50,
@@ -350,7 +350,24 @@ class Game {
                 if (projectile.owner !== character.id && character.isAlive === true && AABBCollision(projectile, character)) {
                     const attacker = this.characters.find(potentialAttacker => potentialAttacker.id === projectile.owner);
                     if (attacker) {
-                        character.health -= calculateDamage(attacker.stats.attack, character.stats.defense, projectile.baseDamage, attacker.stats.crit);
+                        const damage = calculateDamage(attacker.stats.attack, character.stats.defense, projectile.baseDamage, attacker.stats.crit);
+                        character.health -= damage;
+
+                        if (attacker.isHumanPlayer) {
+                            this.addDelayedTransmitPlayer(createBinaryFrame(7, [
+                                { type: 'Uint8', value: 0 }, // damage done by the attaker
+                                { type: 'Uint32', value: damage },
+                                { type: 'Uint32', value: character.id } // target to display damage text above
+                            ]), attacker);
+                        }
+
+                        if (character.isHumanPlayer) {
+                            this.addDelayedTransmitPlayer(createBinaryFrame(7, [
+                                { type: 'Uint8', value: 1 }, // damage done to the player
+                                { type: 'Uint32', value: damage }
+                            ]), character);
+                        }
+
                         if (character.health <= 0) {
                             character.isAlive = false;
                             character.reset();
