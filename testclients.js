@@ -38,9 +38,10 @@ class Client {
                 this.websocket.send(dataview);
 
                 // shoot
-                arraybuffer = new ArrayBuffer(1);
+                arraybuffer = new ArrayBuffer(2);
                 dataview = new DataView(arraybuffer);
                 dataview.setUint8(0, 2);
+                dataview.setUint8(1, 1);
                 this.websocket.send(dataview);
             }
         }, move_rate);
