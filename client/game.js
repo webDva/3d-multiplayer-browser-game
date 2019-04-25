@@ -18,7 +18,7 @@ class Game {
         this.isTouchScreen = 'ontouchstart' in document.documentElement || (window.navigator.maxTouchPoints && window.navigator.maxTouchPoints >= 1);
     }
 
-    create_character(id, x, z, angle, type) {
+    create_character(id, x, z, angle, type, maxHealth) {
         const self = this;
         BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'cutie.babylon', scene).then(function (imported) {
             const mesh = imported.meshes[0];
@@ -46,6 +46,7 @@ class Game {
                 mesh: mesh,
                 eulerY: angle,
                 health: 0,
+                maxHealth: maxHealth,
                 type: type
             };
             self.characters.push(character_struct);
@@ -75,9 +76,6 @@ class Game {
             const healthbarChild = BABYLON.MeshBuilder.CreatePlane('', { width: 5, height: 1, subdivisions: 4 }, scene);
 
             healthbarContainer.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
-
-            healthbarChild.renderingGroupId = 1;
-            healthbarContainer.renderingGroupId = 1;
 
             healthbarChild.position.z = -0.01;
             healthbarContainer.position.y = 5;
@@ -239,7 +237,7 @@ websocket.onmessage = (event) => {
 
         // a new character arrives on the server
         if (dataview.getUint8(0) === 4) {
-            game.create_character(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getFloat32(13), dataview.getInt8(17));
+            game.create_character(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getFloat32(13), dataview.getInt8(17), dataview.getUint32(18));
         }
 
         // new projectiles
@@ -477,8 +475,8 @@ scene.registerBeforeRender(function () {
         // character health bars
         game.characters.forEach(character => {
             const healthbar = character.mesh.healthbar.getChildren()[0];
-            healthbar.scaling.x = character.health / 100;
-            healthbar.position.x = (1 - (character.health / 100)) * -5 / 2;
+            healthbar.scaling.x = character.health / character.maxHealth;
+            healthbar.position.x = (1 - (character.health / character.maxHealth)) * -5 / 2;
         });
 
         // movement animations

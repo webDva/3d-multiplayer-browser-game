@@ -57,8 +57,14 @@ const config = {
     networkUpdatePulseRate: 1000 / 15,
     physicsTickRate: 1000 / 15,
     character: {
-        defaultMovementSpeed: 1,
-        collisionBoxSize: 3 // a square
+        defaultSpeed: 1,
+        collisionBoxSize: 3, // a square
+        defaultStats: {
+            maxHealth: 100,
+            attack: 10,
+            defense: 10,
+            crit: 0.1
+        }
     },
     mapSize: 50,
     pingTime: 1000 * 40
@@ -214,7 +220,8 @@ ws_server.on('connection', websocket => {
                     { type: 'Float32', value: websocket.player.x },
                     { type: 'Float32', value: websocket.player.z },
                     { type: 'Float32', value: websocket.player.angle },
-                    { type: 'Int8', value: 1 } // player type and not an NPC type
+                    { type: 'Int8', value: 1 }, // player type and not an NPC type
+                    { type: 'Uint32', value: websocket.player.stats.maxHealth }
                 ]), websocket);
             }
 
@@ -227,7 +234,8 @@ ws_server.on('connection', websocket => {
                         { type: 'Float32', value: character.x },
                         { type: 'Float32', value: character.z },
                         { type: 'Float32', value: character.angle },
-                        { type: 'Int8', value: character.isHumanPlayer ? 1 : 0 } // 1 if is a player and 0 if an NPC
+                        { type: 'Int8', value: character.isHumanPlayer ? 1 : 0 },// 1 if is a player and 0 if an NPC
+                        { type: 'Uint32', value: character.stats.maxHealth }
                     ]), websocket);
                 });
             }
@@ -298,22 +306,22 @@ class Game {
         })
             .filter(character => { // collision detection with the map boundary
                 if (character.angle === CONSTANTS.DIRECTIONS.UP) {
-                    if (character.z + (character.collisionBoxSize / 2) + character.movement_speed > this.mapSize) {
+                    if (character.z + (character.collisionBoxSize / 2) + character.speed > this.mapSize) {
                         character.isMoving = false;
                         return false;
                     }
                 } else if (character.angle === CONSTANTS.DIRECTIONS.LEFT) {
-                    if (character.x - (character.collisionBoxSize / 2) - character.movement_speed < 0) {
+                    if (character.x - (character.collisionBoxSize / 2) - character.speed < 0) {
                         character.isMoving = false;
                         return false;
                     }
                 } else if (character.angle === CONSTANTS.DIRECTIONS.DOWN) {
-                    if (character.z - (character.collisionBoxSize / 2) - character.movement_speed < 0) {
+                    if (character.z - (character.collisionBoxSize / 2) - character.speed < 0) {
                         character.isMoving = false;
                         return false;
                     }
                 } else if (character.angle === CONSTANTS.DIRECTIONS.RIGHT) {
-                    if (character.x + (character.collisionBoxSize / 2) + character.movement_speed > this.mapSize) {
+                    if (character.x + (character.collisionBoxSize / 2) + character.speed > this.mapSize) {
                         character.isMoving = false;
                         return false;
                     }
@@ -322,8 +330,8 @@ class Game {
                 return true;
             })
             .forEach(character => {
-                character.x += Math.sin(character.angle) * character.movement_speed;
-                character.z += Math.cos(character.angle) * character.movement_speed;
+                character.x += Math.sin(character.angle) * character.speed;
+                character.z += Math.cos(character.angle) * character.speed;
                 character.isMoving = false;
             });
     }
@@ -340,7 +348,14 @@ class Game {
         this.projectiles.forEach(projectile => {
             this.characters.forEach(character => {
                 if (projectile.owner !== character.id && character.isAlive === true && AABBCollision(projectile, character)) {
-                    character.health -= 1;
+                    const attacker = this.characters.find(potentialAttacker => potentialAttacker.id === projectile.owner);
+                    if (attacker) {
+                        character.health -= calculateDamage(attacker.stats.attack, character.stats.defense, projectile.baseDamage, attacker.stats.crit);
+                        if (character.health <= 0) {
+                            character.isAlive = false;
+                            character.reset();
+                        }
+                    }
 
                     this.projectiles.splice(this.projectiles.indexOf(projectile), 1);
                 }
@@ -419,10 +434,11 @@ class Character {
         this.angle = CONSTANTS.DIRECTIONS.DOWN; // facing south. it doesn't have to be zero
 
         // movement
-        this.movement_speed = config.character.defaultMovementSpeed;
+        this.speed = config.character.defaultSpeed;
         this.isMoving = false;
 
-        this.health = 100; // has to be a signed 32-bit integer for negative health values
+        this.stats = config.character.defaultStats;
+        this.health = this.stats.maxHealth; // has to be a signed 32-bit integer for negative health values
 
         this.isAlive = true;
         this.deathTime = 0;
@@ -430,10 +446,6 @@ class Character {
         this.combat = {}; // cooldowns, etc.
 
         this.level = 1;
-
-        this.stats = {
-            maxHealth: 100
-        };
 
         game.characters.push(this);
     }
@@ -470,7 +482,7 @@ class Character {
      * @param {Number} distanceThreshold how far from the target
      */
     moveTo(x, z, distanceThreshold = 3) {
-        const movementDistanceThreshold = this.movement_speed; // how far from an axis
+        const movementDistanceThreshold = this.speed; // how far from an axis
         if (Math.abs(x - this.x) > distanceThreshold || Math.abs(z - this.z) > distanceThreshold) { // has not yet arrived at target location
             if (Math.abs(x - this.x) > movementDistanceThreshold) {
                 if (this.x - x > 0) {
@@ -487,6 +499,19 @@ class Character {
             }
         }
     }
+
+    reset() {
+        this.angle = CONSTANTS.DIRECTIONS.DOWN;
+        this.level = 1;
+        this.isMoving = false;
+        this.speed = config.character.defaultSpeed;
+        this.stats = config.character.defaultStats;
+        this.health = this.stats.maxHealth;
+        this.isAlive = true;
+        this.combat = {};
+        this.x = Math.random() * (game.mapSize - this.collisionBoxSize);
+        this.z = Math.random() * (game.mapSize - this.collisionBoxSize);
+    }
 }
 
 class NPC extends Character {
@@ -495,11 +520,11 @@ class NPC extends Character {
 
         this.aggroTable = []; // a list of player-aggro pairs (.player and .aggro object names)
         this.aggroRadius = 10;
-        this.movement_speed = 0.9;
+        this.speed = 0.9;
 
         this.leashLocation = { x: this.x, z: this.z };
         this.leashRadius = 40;
-        this.isReseting = false;
+        this.isDeaggroing = false;
     }
 
     // NPC aggro initiation/human player detection by NPC
@@ -537,12 +562,12 @@ class NPC extends Character {
     run() {
         // if the NPC is outside its leashing bounds, reset
         if (!pointInCircleCollision(this, this.leashLocation, this.leashRadius)) {
-            this.isReseting = true;
+            this.isDeaggroing = true;
             this.aggroTable = [];
-            this.movement_speed = 3;
+            this.speed = 3;
         }
 
-        if (!this.isReseting) {
+        if (!this.isDeaggroing) {
             // remove players that are dead or don't exist anymore
             this.aggroTable.forEach(aggroPair => {
                 if (!this.game.characters.includes(aggroPair.player) || !aggroPair.player.isAlive) {
@@ -560,13 +585,22 @@ class NPC extends Character {
             if (!pointInCircleCollision(this, this.leashLocation, this.leashRadius * (1 / 10))) {
                 this.moveTo(this.leashLocation.x, this.leashLocation.z);
             } else {
-                this.isReseting = false;
+                this.isDeaggroing = false;
 
                 // have to find a way to organize this for specific mobs
-                this.movement_speed = 0.9;
-                this.health = 100;
+                this.speed = 0.9;
+                this.health = this.stats.maxHealth;
             }
         }
+    }
+
+    reset() {
+        super.reset();
+
+        this.aggroTable = [];
+        this.speed = 0.9;
+        this.leashLocation = { x: this.x, z: this.z };
+        this.isDeaggroing = false;
     }
 }
 
@@ -576,7 +610,7 @@ class CharacterClass {
         this.player = player;
         this.attackA;
         this.attackB;
-        this.stats = {};
+        this.defaultStats;
     }
 }
 
@@ -594,7 +628,8 @@ class Mage extends CharacterClass {
                     speed: 3,
                     creationTime: Date.now(),
                     owner: this.player.id,
-                    collisionBoxSize: 1
+                    collisionBoxSize: 1,
+                    baseDamage: 10
                 };
                 this.player.game.projectiles.push(projectile);
                 this.player.game.addDelayedBroadcast(createBinaryFrame(5, [
@@ -609,10 +644,14 @@ class Mage extends CharacterClass {
         this.attackB = function () {
 
         };
-        this.stats = {
-            maxHealth: 50
+        this.defaultStats = {
+            maxHealth: this.player.stats.maxHealth - 50,
+            attack: this.player.stats.attack * 2,
+            defense: this.player.stats.defense - 5,
+            crit: this.player.stats.crit * 2
         };
-        this.player.stats = this.stats;
+        this.player.stats = this.defaultStats;
+        this.player.health = this.defaultStats.maxHealth;
     }
 }
 
@@ -639,6 +678,23 @@ class Player extends Character {
                 return this.class.attackB();
         }
     }
+
+    reset() {
+        super.reset();
+
+        this.score = 0;
+        this.experiencePoints = 0;
+
+        switch (this.class.number) {
+            case 1:
+                this.class = new Mage(this);
+                break;
+        }
+    }
+}
+
+function calculateDamage(attack, defense, baseDamage, critChance) {
+    return Math.round((attack / defense) * baseDamage * ((Math.random() < critChance) ? 1.5 : 1));
 }
 
 /**
