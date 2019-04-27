@@ -94,7 +94,7 @@ const CONSTANTS = {
 };
 
 const CLASSES = {
-    
+
     MAGE: {
         number: CONSTANTS.CLASS_NUMBERS.MAGE,
         stats: {

@@ -311,10 +311,12 @@ websocket.onmessage = (event) => {
             if (dataview.getUint8(1) === 0) { // damage done by the player
                 damageTextDynamicTexture.drawText(damage, null, null, font, 'yellow', null);
                 const targetId = dataview.getUint32(6);
-                damageTextPlane.parent = game.characters.find(character => character.id === targetId).mesh;
+                const position = game.characters.find(character => character.id === targetId).mesh.position;
+                damageTextPlane.position = new BABYLON.Vector3(position.x, position.y, position.z);
             } else if (dataview.getUint8(1) === 1) { // damage done to the player
                 damageTextDynamicTexture.drawText(damage, null, null, font, 'red', null);
-                damageTextPlane.parent = game.player.mesh;
+                const position = game.player.mesh.position;
+                damageTextPlane.position = new BABYLON.Vector3(position.x, position.y, position.z);
             }
         }
 
