@@ -71,17 +71,85 @@ const config = {
 };
 
 const CONSTANTS = {
+
     DIRECTIONS: {
         UP: Math.PI * (0 / 2),
         LEFT: -Math.PI * (1 / 2),
         DOWN: Math.PI * (2 / 2),
         RIGHT: -Math.PI * (3 / 2)
     },
+
     MOVEMENT: {
         UP: 1,
         LEFT: 2,
         DOWN: 3,
         RIGHT: 4
+    },
+
+    CLASS_NUMBERS: {
+        MAGE: 1,
+        WARRIOR: 2,
+        ARCHER: 3
+    }
+};
+
+const CLASSES = {
+    
+    MAGE: {
+        number: CONSTANTS.CLASS_NUMBERS.MAGE,
+        stats: {
+            maxHealth: config.character.defaultStats.maxHealth - 50,
+            attack: config.character.defaultStats.attack * 2,
+            defense: config.character.defaultStats.defense - 5,
+            crit: config.character.defaultStats.crit * 1.1
+        },
+        attackA: function (player) {
+            if (player.isAlive) {
+                const projectile = {
+                    x: player.x,
+                    z: player.z,
+                    angle: player.angle,
+                    speed: 3,
+                    creationTime: Date.now(),
+                    owner: player.id,
+                    collisionBoxSize: 1,
+                    baseDamage: 10
+                };
+                player.game.projectiles.push(projectile);
+                player.game.addDelayedBroadcast(createBinaryFrame(5, [
+                    { type: 'Float32', value: projectile.x },
+                    { type: 'Float32', value: projectile.z },
+                    { type: 'Float32', value: projectile.angle },
+                    { type: 'Float32', value: projectile.speed },
+                    { type: 'Uint32', value: projectile.owner }
+                ]));
+            }
+        },
+        attackB: function (player) { }
+    },
+
+    WARRIOR: {
+        number: CONSTANTS.CLASS_NUMBERS.WARRIOR,
+        stats: {
+            maxHealth: config.character.defaultStats.maxHealth * 2.5,
+            attack: config.character.defaultStats.attack * 0.9,
+            defense: config.character.defaultStats.defense * 2,
+            crit: config.character.defaultStats.crit * 1.2
+        },
+        attackA: function (player) { },
+        attackB: function (player) { }
+    },
+
+    ARCHER: {
+        number: CONSTANTS.CLASS_NUMBERS.ARCHER,
+        stats: {
+            maxHealth: config.character.defaultStats.maxHealth + 50,
+            attack: config.character.defaultStats.attack * 1.1,
+            defense: config.character.defaultStats.defense * 1.5,
+            crit: config.character.defaultStats.crit * 5 + 2
+        },
+        attackA: function (player) { },
+        attackB: function (player) { }
     }
 };
 
@@ -286,7 +354,7 @@ class Game {
     }
 
     createHumanPlayer() {
-        return new Player(this, 1);
+        return new Player(this, CLASSES.MAGE);
     }
 
     createNPC() {
@@ -621,78 +689,24 @@ class NPC extends Character {
     }
 }
 
-class CharacterClass {
-    constructor(player) {
-        this.number; // 1 = mage, 2 = warrior, 3 = archer
-        this.player = player;
-        this.attackA;
-        this.attackB;
-        this.defaultStats;
-    }
-}
-
-class Mage extends CharacterClass {
-    constructor(player) {
-        super(player);
-
-        this.number = 1;
-        this.attackA = function () {
-            if (this.player.isAlive) {
-                const projectile = {
-                    x: this.player.x,
-                    z: this.player.z,
-                    angle: this.player.angle,
-                    speed: 3,
-                    creationTime: Date.now(),
-                    owner: this.player.id,
-                    collisionBoxSize: 1,
-                    baseDamage: 10
-                };
-                this.player.game.projectiles.push(projectile);
-                this.player.game.addDelayedBroadcast(createBinaryFrame(5, [
-                    { type: 'Float32', value: projectile.x },
-                    { type: 'Float32', value: projectile.z },
-                    { type: 'Float32', value: projectile.angle },
-                    { type: 'Float32', value: projectile.speed },
-                    { type: 'Uint32', value: projectile.owner }
-                ]));
-            }
-        };
-        this.attackB = function () {
-
-        };
-        this.defaultStats = {
-            maxHealth: this.player.stats.maxHealth - 50,
-            attack: this.player.stats.attack * 2,
-            defense: this.player.stats.defense - 5,
-            crit: this.player.stats.crit * 2
-        };
-        this.player.stats = this.defaultStats;
-        this.player.health = this.defaultStats.maxHealth;
-    }
-}
-
 class Player extends Character {
-    constructor(game, characterClass) { // 1 = mage, 2 = warrior, 3 = archer
+    constructor(game, characterClass) {
         super(game, true);
 
         this.score = 0;
         this.experiencePoints = 0;
 
-        this.class;
-        switch (characterClass) {
-            case 1:
-                this.class = new Mage(this);
-                break;
-        }
+        this.class = characterClass;
+        this.stats = this.class.stats;
+        this.health = this.stats.maxHealth;
     }
 
     attack(number) { // 1 (A) or 2 (B)
         switch (number) {
             case 1:
-                return this.class.attackA();
+                return this.class.attackA(this);
             case 2:
-                return this.class.attackB();
+                return this.class.attackB(this);
         }
     }
 
@@ -701,12 +715,8 @@ class Player extends Character {
 
         this.score = 0;
         this.experiencePoints = 0;
-
-        switch (this.class.number) {
-            case 1:
-                this.class = new Mage(this);
-                break;
-        }
+        this.stats = this.class.stats;
+        this.health = this.stats.maxHealth;
     }
 }
 
