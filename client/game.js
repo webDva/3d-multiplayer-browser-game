@@ -109,8 +109,6 @@ class Game {
     }
 
     start() {
-        const self = this;
-
         this.canvas = document.getElementById("canvas");
         this.engine = new BABYLON.Engine(this.canvas, true, { stencil: true });
 
