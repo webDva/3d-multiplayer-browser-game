@@ -41,11 +41,15 @@
     <script src="game.js"></script>
 
     <script>
+        const game = new Game();
+
         let selection = 1;
 
         const selectMage = document.getElementById('select-mage');
         const selectWarrior = document.getElementById('select-warrior');
         const selectArcher = document.getElementById('select-archer');
+
+        const classSelections = document.getElementsByClassName('class-selection');
 
         selectMage.onclick = selectWarrior.onclick = selectArcher.onclick = function () {
             if (this.id === 'select-mage') {
@@ -56,9 +60,9 @@
                 selection = 3;
             }
 
-            selectMage.style.borderColor = 'black';
-            selectWarrior.style.borderColor = 'black';
-            selectArcher.style.borderColor = 'black';
+            for (let i = 0; i < classSelections.length; i++) {
+                classSelections[i].style.borderColor = 'black';
+            }
 
             this.style.borderColor = 'red';
         };
@@ -67,7 +71,6 @@
 
         playButton.onclick = function () {
             document.getElementById('main-menu').style.display = 'none';
-            const game = new Game();
             game.start(selection);
         };
     </script>
