@@ -19,17 +19,58 @@
     <div id="attack-buttons-container" class="dom-ui">
         <img id="a-button-image" class="attack-button a-button touch-screen" src="./assets/abutton.png"></img>
         <div id="a-button" class="attack-button a-button"></div>
-        
+
         <img id="b-button-image" class="attack-button b-button touch-screen" src="./assets/bbutton.png"></img>
         <div id="b-button" class="attack-button b-button"></div>
-    </div>    
+    </div>
 
     <img id="virtualDPad-image" class="dom-ui virtualDPad touch-screen" src="./assets/dpad.png"></img>
     <div id="virtualDPad" class="dom-ui virtualDPad touch-screen"></div>
 
+    <div id="main-menu">
+        <div id="login-container">
+            <p id="select-mage" class="class-selection">Mage</p>
+            <p id="select-warrior" class="class-selection">Warrior</p>
+            <p id="select-archer" class="class-selection">Archer</p>
+
+            <button id="play-button">Play</button>
+        </div>
+    </div>
     <canvas id="canvas" touch-action="none"></canvas>
 
     <script src="game.js"></script>
+
+    <script>
+        let selection = 1;
+
+        const selectMage = document.getElementById('select-mage');
+        const selectWarrior = document.getElementById('select-warrior');
+        const selectArcher = document.getElementById('select-archer');
+
+        selectMage.onclick = selectWarrior.onclick = selectArcher.onclick = function () {
+            if (this.id === 'select-mage') {
+                selection = 1;
+            } else if (this.id === 'select-warrior') {
+                selection = 2;
+            } else if (this.id === 'select-archer') {
+                selection = 3;
+            }
+
+            selectMage.style.borderColor = 'black';
+            selectWarrior.style.borderColor = 'black';
+            selectArcher.style.borderColor = 'black';
+
+            this.style.borderColor = 'red';
+        };
+
+        const playButton = document.getElementById('play-button');
+
+        playButton.onclick = function () {
+            document.getElementById('main-menu').style.display = 'none';
+            const game = new Game();
+            game.start(selection);
+        };
+    </script>
 </body>
 
 </html>

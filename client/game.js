@@ -108,7 +108,7 @@ class Game {
         });
     }
 
-    start() {
+    start(classSelection) {
         this.canvas = document.getElementById("canvas");
         this.engine = new BABYLON.Engine(this.canvas, true, { stencil: true });
 
@@ -288,7 +288,7 @@ class Game {
 
         // open the WebSocket connection
         this.websocket.onopen = () => {
-            this.websocket.send(JSON.stringify({ type: 'join' }));
+            this.websocket.send(JSON.stringify({ type: 'join', class: classSelection }));
         };
 
         // display DOM user interface
@@ -568,6 +568,3 @@ function pointInTriangle(p, v1, v2, v3) {
 function lerp(start, end, time) {
     return start * (1 - time) + end * time;
 }
-
-const game = new Game();
-game.start();

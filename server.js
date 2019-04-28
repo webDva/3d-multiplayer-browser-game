@@ -272,13 +272,13 @@ function createBinaryFrame(id, segments, id_size = true) { // segments is a list
 ws_server.on('connection', websocket => {
     websocket.isAlive = true; // create this property for the sake of implementing ping-pong heartbeats
 
-    websocket.player = game.createHumanPlayer();
-
     websocket.on('message', message => {
         if (typeof message === 'string') {
             const data = JSON.parse(message);
 
             if (data.type === 'join') {
+                websocket.player = game.createHumanPlayer(data.class);
+
                 // send welcome message. the player's id
                 transmit(createBinaryFrame(3, [{ type: 'Uint32', value: websocket.player.id }]), websocket);
 
@@ -353,8 +353,17 @@ class Game {
         }
     }
 
-    createHumanPlayer() {
-        return new Player(this, CLASSES.MAGE);
+    createHumanPlayer(classSelection) {
+        switch (classSelection) {
+            case CONSTANTS.CLASS_NUMBERS.MAGE:
+                return new Player(this, CLASSES.MAGE);
+            case CONSTANTS.CLASS_NUMBERS.WARRIOR:
+                return new Player(this, CLASSES.WARRIOR);
+            case CONSTANTS.CLASS_NUMBERS.ARCHER:
+                return new Player(this, CLASSES.ARCHER);
+            default:
+                return new Player(this, CLASSES.MAGE);
+        }
     }
 
     createNPC() {
