@@ -105,7 +105,7 @@ const CLASSES = {
         },
         attackA: function (player) {
             if (player.isAlive) {
-                const projectile = {
+                const mageProjectileAttackA = {
                     x: player.x,
                     z: player.z,
                     angle: player.angle,
@@ -115,13 +115,13 @@ const CLASSES = {
                     collisionBoxSize: 1,
                     baseDamage: 10
                 };
-                player.game.projectiles.push(projectile);
+                player.game.mageAttackAProjectiles.push(mageProjectileAttackA);
                 player.game.addDelayedBroadcast(createBinaryFrame(5, [
-                    { type: 'Float32', value: projectile.x },
-                    { type: 'Float32', value: projectile.z },
-                    { type: 'Float32', value: projectile.angle },
-                    { type: 'Float32', value: projectile.speed },
-                    { type: 'Uint32', value: projectile.owner }
+                    { type: 'Float32', value: mageProjectileAttackA.x },
+                    { type: 'Float32', value: mageProjectileAttackA.z },
+                    { type: 'Float32', value: mageProjectileAttackA.angle },
+                    { type: 'Float32', value: mageProjectileAttackA.speed },
+                    { type: 'Uint32', value: mageProjectileAttackA.owner }
                 ]));
             }
         },
@@ -345,7 +345,7 @@ class Game {
             attacks: []
         };
         this.npcs = []; // can create a retrieve NPCs Game class method
-        this.projectiles = [];
+        this.mageAttackAProjectiles = [];
         // used IDs
         this.usedCharacterIDs = [];
         this.usedCollectibleIDs = [];
@@ -373,8 +373,8 @@ class Game {
     }
 
     physicsLoop() {
-        // projectile movement
-        this.projectiles.forEach(projectile => {
+        // mage attack A projectile movement
+        this.mageAttackAProjectiles.forEach(projectile => {
             projectile.x += Math.sin(projectile.angle) * projectile.speed;
             projectile.z += Math.cos(projectile.angle) * projectile.speed;
         });
@@ -416,15 +416,15 @@ class Game {
     }
 
     gameLogicLoop() {
-        // remove expired projectiles
-        this.projectiles.forEach(projectile => {
-            if (Date.now() - projectile.creationTime > 10000) {
-                this.projectiles.splice(this.projectiles.indexOf(projectile), 1);
+        // remove expired mage attack A projectiles
+        this.mageAttackAProjectiles.forEach(projectile => {
+            if (Date.now() - projectile.creationTime > 3000) {
+                this.mageAttackAProjectiles.splice(this.mageAttackAProjectiles.indexOf(projectile), 1);
             }
         });
 
-        // projectile-player collisions
-        this.projectiles.forEach(projectile => {
+        // mage attack A projectile-player collisions
+        this.mageAttackAProjectiles.forEach(projectile => {
             this.characters.forEach(character => {
                 if (projectile.owner !== character.id && character.isAlive === true && AABBCollision(projectile, character)) {
                     const attacker = this.characters.find(potentialAttacker => potentialAttacker.id === projectile.owner);
@@ -453,7 +453,7 @@ class Game {
                         }
                     }
 
-                    this.projectiles.splice(this.projectiles.indexOf(projectile), 1);
+                    this.mageAttackAProjectiles.splice(this.mageAttackAProjectiles.indexOf(projectile), 1);
                 }
             });
         });

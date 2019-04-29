@@ -5,7 +5,7 @@ class Game {
         this.session_started = false;
 
         this.characters = [];
-        this.projectiles = [];
+        this.mageAttackAProjectiles = [];
 
         this.mapSize = 50;
 
@@ -52,7 +52,8 @@ class Game {
                 eulerY: angle,
                 health: 0,
                 maxHealth: maxHealth,
-                type: type
+                type: type,
+                collisionBoxSize: 3
             };
             this.characters.push(character_struct);
             mesh.position.x = x;
@@ -200,14 +201,17 @@ class Game {
                     this.create_character(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getFloat32(13), dataview.getInt8(17), dataview.getUint32(18));
                 }
 
-                // new projectiles
+                // new mage attack A projectiles
                 if (dataview.getUint8(0) === 5) {
-                    this.projectiles.push({
+                    this.mageAttackAProjectiles.push({
                         particleSystem: create_particles(dataview.getFloat32(1), dataview.getFloat32(5)),
                         forwardVector: dataview.getFloat32(9),
                         creationTime: Date.now(),
                         speed: dataview.getFloat32(13),
-                        owner: dataview.getUint32(17)
+                        owner: dataview.getUint32(17),
+                        collisionBoxSize: 1,
+                        x: dataview.getFloat32(1),
+                        z: dataview.getFloat32(5)
                     });
                 }
 
@@ -395,11 +399,11 @@ class Game {
                 this.camera.position.y = this.player.mesh.position.y + 25;
                 this.camera.position.z = this.player.mesh.position.z - 25;
 
-                // remove expired projectiles on the client side
-                this.projectiles.forEach(projectile => {
-                    if (Date.now() - projectile.creationTime > 10000) {
+                // remove expired mage attack A projectiles on the client side
+                this.mageAttackAProjectiles.forEach(projectile => {
+                    if (Date.now() - projectile.creationTime > 3000) {
                         projectile.particleSystem.stop();
-                        this.projectiles.splice(this.projectiles.indexOf(projectile), 1);
+                        this.mageAttackAProjectiles.splice(this.mageAttackAProjectiles.indexOf(projectile), 1);
                     }
                 });
 
@@ -467,8 +471,21 @@ class Game {
                     });
                 }
 
-                // projectile particle systems movement
-                this.projectiles.forEach(projectile => {
+                // mage projectile attack A-player collisions
+                this.mageAttackAProjectiles.forEach(projectile => {
+                    this.characters.forEach(character => {
+                        if (projectile.owner !== character.id && AABBCollision(projectile, character)) {
+                            projectile.particleSystem.stop();
+                            this.mageAttackAProjectiles.splice(this.mageAttackAProjectiles.indexOf(projectile), 1);
+                        }
+                    });
+                });
+
+                // mage projectile attack A and projectile particle systems movement
+                this.mageAttackAProjectiles.forEach(projectile => {
+                    projectile.x += Math.sin(projectile.forwardVector) * projectile.speed;
+                    projectile.z += Math.cos(projectile.forwardVector) * projectile.speed;
+
                     projectile.particleSystem.emitter.x += Math.sin(projectile.forwardVector) * projectile.speed;
                     projectile.particleSystem.emitter.z += Math.cos(projectile.forwardVector) * projectile.speed;
                 });
@@ -567,4 +584,16 @@ function pointInTriangle(p, v1, v2, v3) {
 
 function lerp(start, end, time) {
     return start * (1 - time) + end * time;
+}
+
+/**
+ * Axis-aligned bounding boxes collision detection between two objects with an optional extension prediction.
+ * @param {*} a The first object to check for. Must have `.x`, `.z`, and `.collisionBoxSize` members. Can have an extension for collision prediction with the parameter `a_extension`.
+ * @param {*} b The second object to check for. Must have `.x`, `.z`, and `.collisionBoxSize` members.
+ * @param {*} a_extension Used for predictions. Must have `.x` and `.z` members. If the axis has no extension, then it should be `0`.
+ * @return `true` if collison has been detected, `false` otherwise.
+ */
+function AABBCollision(a, b, a_extension = { x: 0, z: 0 }) {
+    return (a.x - (a.collisionBoxSize / 2) + a_extension.x <= b.x + (b.collisionBoxSize / 2) && a.x + (a.collisionBoxSize / 2) + a_extension.x >= b.x - (b.collisionBoxSize / 2)) &&
+        (a.z - (a.collisionBoxSize / 2) + a_extension.z <= b.z + (b.collisionBoxSize / 2) && a.z + (a.collisionBoxSize / 2) + a_extension.z >= b.z - (b.collisionBoxSize / 2));
 }
