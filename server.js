@@ -451,13 +451,6 @@ class Game {
 
                         if (character.health <= 0) {
                             character.isAlive = false;
-
-                            if (character.isHumanPlayer) {
-                                this.addDelayedBroadcast(createBinaryFrame(6, [{ type: 'Uint32', value: character.id }]), character.websocket);
-                                this.addDelayedTransmitPlayer(createBinaryFrame(8, []), character);
-                            } else {
-                                character.reset();
-                            }
                         }
                     }
 
@@ -465,6 +458,18 @@ class Game {
                 }
             });
         });
+
+        // dead characters handling system
+        this.characters.filter(character => { return !character.isAlive; })
+            .forEach(character => {
+                if (character.isHumanPlayer) {
+                    this.addDelayedBroadcast(createBinaryFrame(6, [{ type: 'Uint32', value: character.id }]), character.websocket);
+                    this.addDelayedTransmitPlayer(createBinaryFrame(8, []), character);
+                    this.characters.splice(this.characters.indexOf(character), 1);
+                } else {
+                    character.reset();
+                }
+            });
 
         // NPC loop
         this.characters.filter(character => {

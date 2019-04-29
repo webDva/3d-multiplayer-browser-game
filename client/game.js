@@ -1,5 +1,10 @@
 class Game {
     constructor() {
+        this.player = new Player();
+        this.session_started = false;
+        this.characters = [];
+        this.mageAttackAProjectiles = [];
+
         this.mapSize = 50;
 
         this.clientNetworkPulseRate = 1000 / 15;
@@ -103,12 +108,6 @@ class Game {
     }
 
     start(classSelection) {
-        // values that will be reset
-        this.player = new Player();
-        this.session_started = false;
-        this.characters = [];
-        this.mageAttackAProjectiles = [];
-
         this.canvas = document.getElementById("canvas");
         this.engine = new BABYLON.Engine(this.canvas, true, { stencil: true });
 
