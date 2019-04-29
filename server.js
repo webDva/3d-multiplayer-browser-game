@@ -104,7 +104,7 @@ const CLASSES = {
             crit: config.character.defaultStats.crit * 1.1
         },
         attackA: function (player) {
-            if (player.isAlive) {
+            if (player.isAlive && Date.now() - player.combat.attackATime > 1500) {
                 const mageProjectileAttackA = {
                     x: player.x,
                     z: player.z,
@@ -116,6 +116,7 @@ const CLASSES = {
                     baseDamage: 10
                 };
                 player.game.mageAttackAProjectiles.push(mageProjectileAttackA);
+                player.combat.attackATime = Date.now();
                 player.game.addDelayedBroadcast(createBinaryFrame(5, [
                     { type: 'Float32', value: mageProjectileAttackA.x },
                     { type: 'Float32', value: mageProjectileAttackA.z },
@@ -710,6 +711,7 @@ class Player extends Character {
         this.class = characterClass;
         this.stats = this.class.stats;
         this.health = this.stats.maxHealth;
+        this.combat.attackATime = this.combat.attackBTime = 0;
     }
 
     attack(number) { // 1 (A) or 2 (B)
@@ -728,6 +730,7 @@ class Player extends Character {
         this.experiencePoints = 0;
         this.stats = this.class.stats;
         this.health = this.stats.maxHealth;
+        this.combat.attackATime = this.combat.attackBTime = 0;
     }
 }
 
