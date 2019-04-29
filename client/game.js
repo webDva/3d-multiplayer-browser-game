@@ -22,15 +22,28 @@ class Game {
         this.keyboardMap[e.keyCode] = e.type == 'keydown';
     }
 
-    create_character(id, x, z, angle, type, maxHealth) {
+    create_character(id, x, z, angle, type, maxHealth, classNumber) {
         BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'cutie.babylon', this.scene).then((imported) => {
             const mesh = imported.meshes[0];
+
+            mesh.material.subMaterials[0] = new BABYLON.StandardMaterial('', this.scene);;
+            mesh.material.subMaterials[1] = new BABYLON.StandardMaterial('', this.scene);;
 
             if (type === 0) { // if an NPC
                 mesh.material.subMaterials[0].diffuseColor = BABYLON.Color3.Red();
                 mesh.material.subMaterials[1].diffuseColor = BABYLON.Color3.Yellow();
             } else {
                 mesh.material.subMaterials[0].diffuseColor = BABYLON.Color3.Blue();
+                mesh.material.subMaterials[1].diffuseColor = BABYLON.Color3.Green();
+            }
+
+            if (classNumber === 1) {
+                BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'staff.babylon', this.scene).then((imported) => {
+                    const staffMesh = imported.meshes[0];
+                    staffMesh.position.x = 2;
+                    staffMesh.position.y = 1;
+                    staffMesh.parent = mesh;
+                });
             }
 
             // animation
@@ -196,7 +209,7 @@ class Game {
 
                 // a new character arrives on the server
                 if (dataview.getUint8(0) === 4) {
-                    this.create_character(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getFloat32(13), dataview.getInt8(17), dataview.getUint32(18));
+                    this.create_character(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getFloat32(13), dataview.getInt8(17), dataview.getUint32(18), dataview.getUint8(22));
                 }
 
                 // new mage attack A projectiles

@@ -291,7 +291,8 @@ ws_server.on('connection', websocket => {
                     { type: 'Float32', value: websocket.player.z },
                     { type: 'Float32', value: websocket.player.angle },
                     { type: 'Int8', value: 1 }, // player type and not an NPC type
-                    { type: 'Uint32', value: websocket.player.stats.maxHealth }
+                    { type: 'Uint32', value: websocket.player.stats.maxHealth },
+                    { type: 'Uint8', value: websocket.player.class.number }
                 ]), websocket);
             }
 
@@ -304,8 +305,9 @@ ws_server.on('connection', websocket => {
                         { type: 'Float32', value: character.x },
                         { type: 'Float32', value: character.z },
                         { type: 'Float32', value: character.angle },
-                        { type: 'Int8', value: character.isHumanPlayer ? 1 : 0 },// 1 if is a player and 0 if an NPC
-                        { type: 'Uint32', value: character.stats.maxHealth }
+                        { type: 'Int8', value: character.isHumanPlayer ? 1 : 0 }, // 1 if is a player and 0 if an NPC
+                        { type: 'Uint32', value: character.stats.maxHealth },
+                        { type: 'Uint8', value: character.isHumanPlayer ? character.class.number : 0 }
                     ]), websocket);
                 });
             }

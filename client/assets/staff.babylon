@@ -1,0 +1,25 @@
+{"producer":{"name":"Blender","version":"2.79 (sub 0)","exporter_version":"5.6.4","file":"staff.babylon"},
+"autoClear":true,"clearColor":[0.0509,0.0509,0.0509],"ambientColor":[0,0,0],"gravity":[0,-9.81,0],
+"materials":[{"name":"staff.Material","id":"staff.Material","ambient":[0.8,0.0552,0.034],"diffuse":[0.64,0.0442,0.0272],"specular":[0.5,0.5,0.5],"emissive":[0,0,0],"specularPower":50,"alpha":1,"backFaceCulling":true,"checkReadyOnlyOnce":false,"maxSimultaneousLights":4},
+{"name":"staff.Material.001","id":"staff.Material.001","ambient":[0,0.3363,0.8],"diffuse":[0,0.269,0.64],"specular":[0.5,0.5,0.5],"emissive":[0,0,0],"specularPower":50,"alpha":1,"backFaceCulling":true,"checkReadyOnlyOnce":false,"maxSimultaneousLights":4}],
+"multiMaterials":[{"name":"staff.Multimaterial#0","id":"staff.Multimaterial#0","materials":["staff.Material","staff.Material.001"]}],
+"skeletons":[{"name":"Armature","id":0,"dimensionsAtRest":[0,1,0],"bones":[
+{"name":"Bone","index":0,"matrix":[1,0,0,0,0,1,0,0,0,0,-1,0,0.0097,0.9887,0.0139,1],"rest":[1,0,0,0,0,1,0,0,0,0,-1,0,0.0097,0.9887,0.0139,1],"parentBoneIndex":-1,"length":1}]}],
+"meshes":[{"name":"Cube","id":"Cube","materialId":"staff.Multimaterial#0","billboardMode":0,"position":[0,0,0],"rotation":[0,0,0],"scaling":[1,1,1],"isVisible":true,"freezeWorldMatrix":false,"isEnabled":true,"checkCollisions":false,"receiveShadows":false,"pickable":true,"tags":"","skeletonId":0,"numBoneInfluencers":1
+,"positions":[0.1647,-0.5507,-0.1647,-0.1647,-0.5507,0.1647,0.1647,-0.5507,0.1647,0.1647,2.8012,0.1647,0.1647,2.8012,-0.1647,-0.1647,-0.5507,-0.1647,-0.1647,2.8012,-0.1647,-0.1647,2.8012,0.1647,-0.2778,2.9799,0.2778,0.2778,2.9799,-0.2778,-0.2778,2.9799,-0.2778,0.2778,2.9799,0.2778,-0.2778,2.9799,0.2778,0.2778,3.5314,0.2778,0.2778,2.9799,0.2778,-0.2778,3.5314,0.2778,0.2778,3.5314,-0.2778
+,0.2778,2.9799,-0.2778,-0.2778,3.5314,-0.2778,-0.2778,2.9799,-0.2778]
+,"normals":[0.577,-0.577,-0.577,-0.577,-0.577,0.577,0.577,-0.577,0.577,0.64,-0.426,0.64,0.64,-0.426,-0.64,-0.577,-0.577,-0.577,-0.64,-0.426,-0.64,-0.64,-0.426,0.64,-0.672,-0.312,0.672,0.672,-0.312,-0.672,-0.672,-0.312,-0.672,0.672,-0.312,0.672,-0.672,-0.312,0.672,0.577,0.577,0.577,0.672,-0.312,0.672,-0.577,0.577,0.577,0.577,0.577,-0.577
+,0.672,-0.312,-0.672,-0.577,0.577,-0.577,-0.672,-0.312,-0.672]
+,"matricesWeights":[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0
+,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0]
+,"matricesIndices":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+,"indices":[0,1,2,3,0,2,4,5,0,6,1,5,2,7,3,6,8,7,3,9,4,4,10,6,7,11,3,0,5,1,3,4,0,4,6,5,6,7,1,2,1,7,6,10,8,3,11,9,4,9
+,10,7,8,11,12,13,14,15,16,13,17,18,19,14,16,17,19,15,12,12,15,13,15,18,16,17,16,18,14,13,16,19,18,15]
+,"subMeshes":[{"materialIndex":0,"verticesStart":0,"verticesCount":12,"indexStart":0,"indexCount":54},{"materialIndex":1,"verticesStart":12,"verticesCount":8,"indexStart":54,"indexCount":30}]
+,"instances":[]}
+],
+"morphTargetManagers":[],
+"cameras":[],
+"lights":[],
+"shadowGenerators":[]
+}
