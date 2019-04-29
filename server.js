@@ -279,6 +279,7 @@ ws_server.on('connection', websocket => {
 
             if (data.type === 'join') {
                 websocket.player = game.createHumanPlayer(data.class);
+                websocket.player.websocket = websocket; // for removing a player when their Player object is known
 
                 // send welcome message. the player's id
                 transmit(createBinaryFrame(3, [{ type: 'Uint32', value: websocket.player.id }]), websocket);
@@ -427,7 +428,7 @@ class Game {
         // mage attack A projectile-player collisions
         this.mageAttackAProjectiles.forEach(projectile => {
             this.characters.forEach(character => {
-                if (projectile.owner !== character.id && character.isAlive === true && AABBCollision(projectile, character)) {
+                if (projectile.owner !== character.id && character.isAlive && AABBCollision(projectile, character)) {
                     const attacker = this.characters.find(potentialAttacker => potentialAttacker.id === projectile.owner);
                     if (attacker) {
                         const damage = calculateDamage(attacker.stats.attack, character.stats.defense, projectile.baseDamage, attacker.stats.crit);
@@ -450,7 +451,13 @@ class Game {
 
                         if (character.health <= 0) {
                             character.isAlive = false;
-                            character.reset();
+
+                            if (character.isHumanPlayer) {
+                                this.addDelayedBroadcast(createBinaryFrame(6, [{ type: 'Uint32', value: character.id }]), character.websocket);
+                                this.addDelayedTransmitPlayer(createBinaryFrame(8, []), character);
+                            } else {
+                                character.reset();
+                            }
                         }
                     }
 
@@ -781,8 +788,6 @@ setInterval(function () {
 setInterval(function () {
     ws_server.clients.forEach(websocket => {
         if (websocket.isAlive === false) {
-            game.characters.splice(game.characters.indexOf(websocket.player), 1);
-            broadcast(createBinaryFrame(6, [{ type: 'Uint32', value: websocket.player.id }]), websocket);
             return websocket.terminate();
         }
 

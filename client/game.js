@@ -217,7 +217,6 @@ class Game {
 
                 // a player disconnects
                 if (dataview.getUint8(0) === 6) {
-                    // player objects can be duplicated too,so this would actually need an array from Array.filter
                     const character = this.characters.find(character => character.id === dataview.getUint32(1));
                     if (character) {
                         character.mesh.dispose();
@@ -235,7 +234,8 @@ class Game {
                     }
                 }
 
-                if (dataview.getUint8(0) === 7) { // damage text
+                // damage text
+                if (dataview.getUint8(0) === 7) {
                     const damage = dataview.getUint32(2);
 
                     const planeSize = 2;
@@ -274,6 +274,7 @@ class Game {
 
                     if (dataview.getUint8(1) === 0) { // damage done by the player
                         damageTextDynamicTexture.drawText(damage, null, null, font, 'yellow', null);
+                        // this.characters.find(character => character.id === targetId) can be undefined because it gets removed. it needs a check
                         const targetId = dataview.getUint32(6);
                         const position = this.characters.find(character => character.id === targetId).mesh.position;
                         damageTextPlane.position = new BABYLON.Vector3(position.x, position.y, position.z);
@@ -282,6 +283,11 @@ class Game {
                         const position = this.player.mesh.position;
                         damageTextPlane.position = new BABYLON.Vector3(position.x, position.y, position.z);
                     }
+                }
+
+                // game over
+                if (dataview.getUint8(0) === 8) {
+                    console.log('dead')
                 }
 
                 // no player deaths for now
