@@ -105,7 +105,7 @@ const CLASSES = {
         },
         attackA: function (player) {
             if (player.isAlive && Date.now() - player.combat.attackATime > 1500) {
-                const mageProjectileAttackA = {
+                const projectile = {
                     x: player.x,
                     z: player.z,
                     angle: player.angle,
@@ -113,16 +113,17 @@ const CLASSES = {
                     creationTime: Date.now(),
                     owner: player.id,
                     collisionBoxSize: 1,
-                    baseDamage: 10
+                    baseDamage: 10,
+                    type: null
                 };
-                player.game.mageAttackAProjectiles.push(mageProjectileAttackA);
+                player.game.projectiles.push(projectile);
                 player.combat.attackATime = Date.now();
                 player.game.addDelayedBroadcast(createBinaryFrame(5, [
-                    { type: 'Float32', value: mageProjectileAttackA.x },
-                    { type: 'Float32', value: mageProjectileAttackA.z },
-                    { type: 'Float32', value: mageProjectileAttackA.angle },
-                    { type: 'Float32', value: mageProjectileAttackA.speed },
-                    { type: 'Uint32', value: mageProjectileAttackA.owner }
+                    { type: 'Float32', value: projectile.x },
+                    { type: 'Float32', value: projectile.z },
+                    { type: 'Float32', value: projectile.angle },
+                    { type: 'Float32', value: projectile.speed },
+                    { type: 'Uint32', value: projectile.owner }
                 ]));
             }
         },
@@ -348,8 +349,7 @@ class Game {
         this.combat = {
             attacks: []
         };
-        this.npcs = []; // can create a retrieve NPCs Game class method
-        this.mageAttackAProjectiles = [];
+        this.projectiles = [];
         // used IDs
         this.usedCharacterIDs = [];
         this.usedCollectibleIDs = [];
@@ -377,8 +377,8 @@ class Game {
     }
 
     physicsLoop() {
-        // mage attack A projectile movement
-        this.mageAttackAProjectiles.forEach(projectile => {
+        // projectile movement
+        this.projectiles.forEach(projectile => {
             projectile.x += Math.sin(projectile.angle) * projectile.speed;
             projectile.z += Math.cos(projectile.angle) * projectile.speed;
         });
@@ -420,15 +420,15 @@ class Game {
     }
 
     gameLogicLoop() {
-        // remove expired mage attack A projectiles
-        this.mageAttackAProjectiles.forEach(projectile => {
+        // remove expired projectiles
+        this.projectiles.forEach(projectile => {
             if (Date.now() - projectile.creationTime > 3000) {
-                this.mageAttackAProjectiles.splice(this.mageAttackAProjectiles.indexOf(projectile), 1);
+                this.projectiles.splice(this.projectiles.indexOf(projectile), 1);
             }
         });
 
-        // mage attack A projectile-player collisions
-        this.mageAttackAProjectiles.forEach(projectile => {
+        // projectile-player collisions
+        this.projectiles.forEach(projectile => {
             this.characters.forEach(character => {
                 if (projectile.owner !== character.id && character.isAlive && AABBCollision(projectile, character)) {
                     const attacker = this.characters.find(potentialAttacker => potentialAttacker.id === projectile.owner);
@@ -456,7 +456,7 @@ class Game {
                         }
                     }
 
-                    this.mageAttackAProjectiles.splice(this.mageAttackAProjectiles.indexOf(projectile), 1);
+                    this.projectiles.splice(this.projectiles.indexOf(projectile), 1);
                 }
             });
         });

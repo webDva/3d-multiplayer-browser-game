@@ -3,7 +3,7 @@ class Game {
         this.player = new Player();
         this.session_started = false;
         this.characters = [];
-        this.mageAttackAProjectiles = [];
+        this.projectiles = [];
 
         this.mapSize = 50;
 
@@ -212,9 +212,9 @@ class Game {
                     this.create_character(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getFloat32(13), dataview.getInt8(17), dataview.getUint32(18), dataview.getUint8(22));
                 }
 
-                // new mage attack A projectiles
+                // new projectiles
                 if (dataview.getUint8(0) === 5) {
-                    this.mageAttackAProjectiles.push({
+                    this.projectiles.push({
                         particleSystem: create_particles(dataview.getFloat32(1), dataview.getFloat32(5)),
                         forwardVector: dataview.getFloat32(9),
                         creationTime: Date.now(),
@@ -222,7 +222,8 @@ class Game {
                         owner: dataview.getUint32(17),
                         collisionBoxSize: 1,
                         x: dataview.getFloat32(1),
-                        z: dataview.getFloat32(5)
+                        z: dataview.getFloat32(5),
+                        type: null
                     });
                 }
 
@@ -416,11 +417,11 @@ class Game {
                 this.camera.position.y = this.player.mesh.position.y + 25;
                 this.camera.position.z = this.player.mesh.position.z - 25;
 
-                // remove expired mage attack A projectiles on the client side
-                this.mageAttackAProjectiles.forEach(projectile => {
+                // remove expired projectiles on the client side
+                this.projectiles.forEach(projectile => {
                     if (Date.now() - projectile.creationTime > 3000) {
                         projectile.particleSystem.stop();
-                        this.mageAttackAProjectiles.splice(this.mageAttackAProjectiles.indexOf(projectile), 1);
+                        this.projectiles.splice(this.projectiles.indexOf(projectile), 1);
                     }
                 });
 
@@ -488,18 +489,18 @@ class Game {
                     });
                 }
 
-                // mage projectile attack A-player collisions
-                this.mageAttackAProjectiles.forEach(projectile => {
+                // projectile-player collisions
+                this.projectiles.forEach(projectile => {
                     this.characters.forEach(character => {
                         if (projectile.owner !== character.id && AABBCollision(projectile, character)) {
                             projectile.particleSystem.stop();
-                            this.mageAttackAProjectiles.splice(this.mageAttackAProjectiles.indexOf(projectile), 1);
+                            this.projectiles.splice(this.projectiles.indexOf(projectile), 1);
                         }
                     });
                 });
 
-                // mage projectile attack A and projectile particle systems movement
-                this.mageAttackAProjectiles.forEach(projectile => {
+                // projectile and projectile particle systems movement
+                this.projectiles.forEach(projectile => {
                     projectile.x += Math.sin(projectile.forwardVector) * projectile.speed;
                     projectile.z += Math.cos(projectile.forwardVector) * projectile.speed;
 
