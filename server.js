@@ -606,7 +606,6 @@ class Character {
 
     reset() {
         this.angle = CONSTANTS.DIRECTIONS.DOWN;
-        this.level = 1;
         this.isMoving = false;
         this.speed = config.character.defaultSpeed;
         this.stats = config.character.defaultStats;
@@ -729,20 +728,10 @@ class Player extends Character {
                 return this.class.attackB(this);
         }
     }
-
-    reset() {
-        super.reset();
-
-        this.score = 0;
-        this.experiencePoints = 0;
-        this.stats = this.class.stats;
-        this.health = this.stats.maxHealth;
-        this.combat.attackATime = this.combat.attackBTime = 0;
-    }
 }
 
 function calculateDamage(attack, defense, baseDamage, critChance) {
-    return Math.round((attack / defense) * baseDamage * ((Math.random() < critChance) ? 1.5 : 1));
+    return Math.round((attack / defense) * baseDamage * ((Math.random() < critChance) ? 1.5 : 1)) || 1;
 }
 
 /**
