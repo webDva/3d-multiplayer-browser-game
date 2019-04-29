@@ -326,8 +326,10 @@ ws_server.on('connection', websocket => {
     });
 
     websocket.on('close', () => {
-        game.characters.splice(game.characters.indexOf(websocket.player), 1);
-        broadcast(createBinaryFrame(6, [{ type: 'Uint32', value: websocket.player.id }]), websocket);
+        if (game.characters.find(character => character === websocket.player)) {
+            game.characters.splice(game.characters.indexOf(websocket.player), 1);
+            broadcast(createBinaryFrame(6, [{ type: 'Uint32', value: websocket.player.id }]), websocket);
+        }
     });
 
     websocket.on('pong', () => websocket.isAlive = true);
