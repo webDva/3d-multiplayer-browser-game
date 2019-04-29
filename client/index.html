@@ -36,12 +36,18 @@
             <button id="play-button">Play</button>
         </div>
     </div>
+
+    <div id="game-over">
+        <h1>Game Over</h1>
+        <button id="continue-button">Continue?</button>
+    </div>
+
     <canvas id="canvas" touch-action="none"></canvas>
 
     <script src="game.js"></script>
 
     <script>
-        const game = new Game();
+        let game = new Game();
 
         let selection = 1;
 
@@ -73,6 +79,18 @@
             document.getElementById('main-menu').style.display = 'none';
             document.getElementById('canvas').style.display = 'block';
             game.start(selection);
+        };
+
+        const continueButton = document.getElementById('continue-button');
+
+        continueButton.onclick = function () {
+            game.scene.dispose();
+            game.engine.dispose();
+            game = new Game();
+
+            document.getElementById('main-menu').style.display = 'block';
+            document.getElementById('canvas').style.display = 'none';
+            document.getElementById('game-over').style.display = 'none';
         };
     </script>
 </body>

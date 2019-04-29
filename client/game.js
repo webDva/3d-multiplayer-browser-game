@@ -287,7 +287,7 @@ class Game {
 
                 // game over
                 if (dataview.getUint8(0) === 8) {
-                    console.log('dead')
+                    document.getElementById('game-over').style.display = 'block';
                 }
 
                 // no player deaths for now
