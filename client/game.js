@@ -22,7 +22,7 @@ class Game {
         this.keyboardMap[e.keyCode] = e.type == 'keydown';
     }
 
-    create_character(id, x, z, angle, type, maxHealth, classNumber) {
+    create_character(id, x, z, angle, type, maxHealth, classNumber, string) {
         BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'cutie.babylon', this.scene).then((imported) => {
             const mesh = imported.meshes[0];
 
@@ -105,6 +105,38 @@ class Game {
             healthbarContainer.material = healthBarContainerMaterial;
 
             mesh.healthbar = healthbarContainer;
+
+            // name
+            if (string) {
+                const planeSize = 7;
+                const dTSize = planeSize * 120;
+
+                const nameDynamicTexture = new BABYLON.DynamicTexture('', dTSize, this.scene);
+                nameDynamicTexture.hasAlpha = true;
+
+                const ctx = nameDynamicTexture.getContext();
+                const size = 12;
+                const fontType = 'arial';
+                ctx.font = size + 'px ' + fontType;
+                const textWidth = ctx.measureText(string).width;
+                const ratio = textWidth / size;
+                const fontSize = Math.floor(dTSize / ratio);
+                const font = fontSize + 'px ' + fontType;
+
+                const nameTextMaterial = new BABYLON.StandardMaterial('', this.scene);
+                nameTextMaterial.diffuseTexture = nameDynamicTexture;
+                nameTextMaterial.backFaceCulling = false;
+                nameTextMaterial.diffuseColor = BABYLON.Color3.Black();
+                nameTextMaterial.specularColor = BABYLON.Color3.Black();
+
+                const nameTextPlane = BABYLON.MeshBuilder.CreatePlane('', { width: planeSize, height: planeSize, subdivisions: 4 }, this.scene);
+                nameTextPlane.material = nameTextMaterial;
+                nameTextPlane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+
+                nameDynamicTexture.drawText(string, null, null, font, 'white', null);
+                nameTextPlane.position.y = 1.2;
+                nameTextPlane.parent = healthbarContainer;
+            }
 
             // if this is the player's character
 
@@ -210,7 +242,15 @@ class Game {
 
                 // a new character arrives on the server
                 if (dataview.getUint8(0) === 4) {
-                    this.create_character(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getFloat32(13), dataview.getInt8(17), dataview.getUint32(18), dataview.getUint8(22));
+                    let string = null;
+                    if (dataview.getInt8(17) === 1) {
+                        const ab = new Uint8Array(dataview.getUint8(23));
+                        for (let i = 0; i < dataview.getUint8(23); i++) {
+                            ab[i] = dataview.getUint8(24 + i);
+                        }
+                        string = String.fromCharCode.apply(null, ab);
+                    }
+                    this.create_character(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getFloat32(13), dataview.getInt8(17), dataview.getUint32(18), dataview.getUint8(22), string);
                 }
 
                 // new projectiles

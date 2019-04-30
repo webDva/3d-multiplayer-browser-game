@@ -4,6 +4,7 @@ const httpServer = require('http').Server(app);
 const WebSocket = require('uws');
 const ws_server = new WebSocket.Server({ server: httpServer });
 const crypto = require('crypto');
+const fs = require('fs');
 
 const minify = require('@node-minify/core');
 const gcc = require('@node-minify/google-closure-compiler');
@@ -162,6 +163,17 @@ httpServer.listen(PORT, function () {
     console.log(`HTTP server started on port ${PORT}.`);
 });
 
+const adjectives = fs.readFileSync('./usernames/adjectives.txt').toString().split('\n');
+const nouns = fs.readFileSync('./usernames/nouns.txt').toString().split('\n');
+
+function stringToArrayBuffer(string) {
+    const arraybuffer = new Uint8Array(string.length);
+    for (let i = 0; i < string.length; i++) {
+        arraybuffer[i] = string.charCodeAt(i);
+    }
+    return arraybuffer;
+}
+
 function randomUint32ID(listOfObjects, usedIDsList) {
     // the items in the first array must have an .id property for this to work
     let newID = crypto.randomBytes(4).readUInt32BE(0, true);
@@ -286,22 +298,27 @@ ws_server.on('connection', websocket => {
                 transmit(createBinaryFrame(3, [{ type: 'Uint32', value: websocket.player.id }]), websocket);
 
                 // notify the rest of the room of the new player
-                broadcast(createBinaryFrame(4, [
+                const message = [
                     { type: 'Uint32', value: websocket.player.id },
                     { type: 'Float32', value: websocket.player.x },
                     { type: 'Float32', value: websocket.player.z },
                     { type: 'Float32', value: websocket.player.angle },
                     { type: 'Int8', value: 1 }, // player type and not an NPC type
                     { type: 'Uint32', value: websocket.player.stats.maxHealth },
-                    { type: 'Uint8', value: websocket.player.class.number }
-                ]), websocket);
+                    { type: 'Uint8', value: websocket.player.class.number },
+                    { type: 'Uint8', value: websocket.player.binaryName.length }
+                ];
+                for (let i = 0; i < websocket.player.binaryName.length; i++) {
+                    message.push({ type: 'Uint8', value: websocket.player.binaryName[i] });
+                }
+                broadcast(createBinaryFrame(4, message), websocket);
             }
 
             // a player has requested map data such as players
             if (data.type === 'request_map_data') {
                 // send list of players and NPCs
                 game.characters.forEach(character => {
-                    transmit(createBinaryFrame(4, [
+                    const message = [
                         { type: 'Uint32', value: character.id },
                         { type: 'Float32', value: character.x },
                         { type: 'Float32', value: character.z },
@@ -309,7 +326,14 @@ ws_server.on('connection', websocket => {
                         { type: 'Int8', value: character.isHumanPlayer ? 1 : 0 }, // 1 if is a player and 0 if an NPC
                         { type: 'Uint32', value: character.stats.maxHealth },
                         { type: 'Uint8', value: character.isHumanPlayer ? character.class.number : 0 }
-                    ]), websocket);
+                    ];
+                    if (character.isHumanPlayer) {
+                        message.push({ type: 'Uint8', value: character.binaryName.length });
+                        for (let i = 0; i < character.binaryName.length; i++) {
+                            message.push({ type: 'Uint8', value: character.binaryName[i] });
+                        }
+                    }
+                    transmit(createBinaryFrame(4, message), websocket);
                 });
             }
         }
@@ -725,6 +749,9 @@ class Player extends Character {
         this.stats = this.class.stats;
         this.health = this.stats.maxHealth;
         this.combat.attackATime = this.combat.attackBTime = 0;
+
+        this.name = adjectives[parseInt(Math.random() * adjectives.length)] + '_' + nouns[parseInt(Math.random() * nouns.length)];
+        this.binaryName = stringToArrayBuffer(this.name);
     }
 
     attack(number) { // 1 (A) or 2 (B)
