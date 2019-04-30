@@ -43,6 +43,7 @@ class Game {
                     staffMesh.position.x = 2;
                     staffMesh.position.y = 1;
                     staffMesh.parent = mesh;
+                    mesh.staffWeapon = staffMesh;
                 });
             }
 
@@ -214,7 +215,7 @@ class Game {
 
                 // new projectiles
                 if (dataview.getUint8(0) === 5) {
-                    this.projectiles.push({
+                    const projectile = {
                         particleSystem: create_particles(dataview.getFloat32(1), dataview.getFloat32(5)),
                         forwardVector: dataview.getFloat32(9),
                         creationTime: Date.now(),
@@ -224,7 +225,15 @@ class Game {
                         x: dataview.getFloat32(1),
                         z: dataview.getFloat32(5),
                         type: null
-                    });
+                    };
+                    this.projectiles.push(projectile);
+
+                    const staff = this.characters.find(character => character.id === projectile.owner).mesh.staffWeapon;
+
+                    const mageAttackAAnimation = new BABYLON.Animation('', 'rotation.x', 15, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_RELATIVE);
+                    mageAttackAAnimation.setKeys([{ frame: 10, value: Math.PI * (1 / 2) }, { frame: 20, value: 0 }]);
+                    staff.animations = [mageAttackAAnimation];
+                    this.scene.beginAnimation(staff, 0, 20, false, 1);
                 }
 
                 // a player disconnects
