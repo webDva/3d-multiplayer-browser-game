@@ -750,7 +750,11 @@ class Player extends Character {
         this.health = this.stats.maxHealth;
         this.combat.attackATime = this.combat.attackBTime = 0;
 
-        this.name = adjectives[parseInt(Math.random() * adjectives.length)] + '_' + nouns[parseInt(Math.random() * nouns.length)];
+        let firstName = adjectives[parseInt(Math.random() * adjectives.length)];
+        firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+        let secondName = nouns[parseInt(Math.random() * nouns.length)];
+        secondName = secondName.charAt(0).toUpperCase() + secondName.slice(1);
+        this.name = firstName + secondName + Math.floor(Math.random() * 9999 + 1).toString();
         this.binaryName = stringToArrayBuffer(this.name);
     }
 
