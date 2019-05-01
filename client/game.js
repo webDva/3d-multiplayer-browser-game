@@ -117,20 +117,23 @@ class Game {
 
             // name
             if (string) {
-                const planeSize = 7;
-                const dTSize = planeSize * 120;
+                const fontSize = 20;
+                const font = fontSize + "px Arial";
+                const planeHeight = 1.5;
+                const DTHeight = 1.5 * fontSize;
+                const ratio = planeHeight / DTHeight;
 
-                const nameDynamicTexture = new BABYLON.DynamicTexture('', dTSize, this.scene);
+                //Use a temporay dynamic texture to calculate the length of the text on the dynamic texture canvas
+                const tempDynamicTexture = new BABYLON.DynamicTexture("DynamicTexture", 64, this.scene);
+                const tmpctx = tempDynamicTexture.getContext();
+                tmpctx.font = font;
+                const DTWidth = tmpctx.measureText(string).width + 8;
+                tempDynamicTexture.dispose();
+
+                const planeWidth = DTWidth * ratio;
+
+                const nameDynamicTexture = new BABYLON.DynamicTexture('', { width: DTWidth, height: DTHeight }, this.scene);
                 nameDynamicTexture.hasAlpha = true;
-
-                const ctx = nameDynamicTexture.getContext();
-                const size = 12;
-                const fontType = 'arial';
-                ctx.font = size + 'px ' + fontType;
-                const textWidth = ctx.measureText(string).width;
-                const ratio = textWidth / size;
-                const fontSize = Math.floor(dTSize / ratio);
-                const font = fontSize + 'px ' + fontType;
 
                 const nameTextMaterial = new BABYLON.StandardMaterial('', this.scene);
                 nameTextMaterial.diffuseTexture = nameDynamicTexture;
@@ -138,7 +141,7 @@ class Game {
                 nameTextMaterial.diffuseColor = BABYLON.Color3.Black();
                 nameTextMaterial.specularColor = BABYLON.Color3.Black();
 
-                const nameTextPlane = BABYLON.MeshBuilder.CreatePlane('', { width: planeSize, height: planeSize, subdivisions: 4 }, this.scene);
+                const nameTextPlane = BABYLON.MeshBuilder.CreatePlane('', { width: planeWidth, height: planeHeight, subdivisions: 4 }, this.scene);
                 nameTextPlane.material = nameTextMaterial;
                 nameTextPlane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
 
@@ -323,20 +326,22 @@ class Game {
                 if (dataview.getUint8(0) === 7) {
                     const damage = dataview.getUint32(2);
 
-                    const planeSize = 2;
-                    const dTSize = planeSize * 60;
+                    const fontSize = 20;
+                    const font = fontSize + "px Arial";
+                    const planeHeight = 1.5;
+                    const DTHeight = 1.5 * fontSize;
+                    const ratio = planeHeight / DTHeight;
 
-                    const damageTextDynamicTexture = new BABYLON.DynamicTexture('', dTSize, this.scene);
+                    //Use a temporay dynamic texture to calculate the length of the text on the dynamic texture canvas
+                    const tempDynamicTexture = new BABYLON.DynamicTexture("DynamicTexture", 64, this.scene);
+                    const tmpctx = tempDynamicTexture.getContext();
+                    tmpctx.font = font;
+                    const DTWidth = tmpctx.measureText(damage).width + 8;
+
+                    const planeWidth = DTWidth * ratio;
+
+                    const damageTextDynamicTexture = new BABYLON.DynamicTexture('', { width: DTWidth, height: DTHeight }, this.scene);
                     damageTextDynamicTexture.hasAlpha = true;
-
-                    const ctx = damageTextDynamicTexture.getContext();
-                    const size = 12;
-                    const fontType = 'arial';
-                    ctx.font = size + 'px ' + fontType;
-                    const textWidth = ctx.measureText(damage).width;
-                    const ratio = textWidth / size;
-                    const fontSize = Math.floor(dTSize / ratio);
-                    const font = fontSize + 'px ' + fontType;
 
                     const damageTextMaterial = new BABYLON.StandardMaterial('', this.scene);
                     damageTextMaterial.diffuseTexture = damageTextDynamicTexture;
@@ -344,7 +349,7 @@ class Game {
                     damageTextMaterial.diffuseColor = BABYLON.Color3.White();
                     damageTextMaterial.specularColor = BABYLON.Color3.Black();
 
-                    const damageTextPlane = BABYLON.MeshBuilder.CreatePlane('', { width: planeSize, height: planeSize, subdivisions: 4 }, this.scene);
+                    const damageTextPlane = BABYLON.MeshBuilder.CreatePlane('', { width: planeWidth, height: planeHeight, subdivisions: 4 }, this.scene);
                     damageTextPlane.material = damageTextMaterial;
                     damageTextPlane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
 
@@ -355,6 +360,7 @@ class Game {
                         damageTextDynamicTexture.dispose();
                         damageTextPlane.dispose();
                         damageTextMaterial.dispose();
+                        tempDynamicTexture.dispose();
                     });
 
                     if (dataview.getUint8(1) === 0) { // damage done by the player
