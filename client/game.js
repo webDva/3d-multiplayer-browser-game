@@ -262,27 +262,42 @@ class Game {
                     this.create_character(dataview.getUint32(1), dataview.getFloat32(5), dataview.getFloat32(9), dataview.getFloat32(13), dataview.getInt8(17), dataview.getUint32(18), dataview.getUint8(22), string);
                 }
 
-                // new projectiles
-                if (dataview.getUint8(0) === 5) {
+                // mage attack A
+                if (dataview.getUint8(0) === 5 && dataview.getUint8(1) === 11) {
                     const projectile = {
-                        particleSystem: create_particles(dataview.getFloat32(1), dataview.getFloat32(5)),
-                        forwardVector: dataview.getFloat32(9),
+                        particleSystem: create_particles(dataview.getFloat32(2), dataview.getFloat32(6)),
+                        forwardVector: dataview.getFloat32(10),
                         creationTime: Date.now(),
-                        speed: dataview.getFloat32(13),
-                        owner: dataview.getUint32(17),
+                        speed: dataview.getFloat32(14),
+                        owner: dataview.getUint32(18),
                         collisionBoxSize: 1,
-                        x: dataview.getFloat32(1),
-                        z: dataview.getFloat32(5),
+                        x: dataview.getFloat32(2),
+                        z: dataview.getFloat32(6),
                         type: null
                     };
                     this.projectiles.push(projectile);
 
                     const staff = this.characters.find(character => character.id === projectile.owner).mesh.classWeapon;
 
-                    const mageAttackAAnimation = new BABYLON.Animation('', 'rotation.x', 15, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_RELATIVE);
+                    const mageAttackAAnimation = new BABYLON.Animation('', 'rotation.x', 25, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_RELATIVE);
                     mageAttackAAnimation.setKeys([{ frame: 10, value: Math.PI * (1 / 2) }, { frame: 20, value: 0 }]);
                     staff.animations = [mageAttackAAnimation];
                     this.scene.beginAnimation(staff, 0, 20, false, 1);
+                }
+
+                // warrior attack A
+                if (dataview.getUint8(0) === 5 && dataview.getUint8(1) === 21) {
+                    const character = this.characters.find(character => character.id === dataview.getUint32(2));
+                    if (character) {
+                        const circle = BABYLON.MeshBuilder.CreateDisc('', { radius: 10 }, this.scene);
+                        circle.position.x = character.x;
+                        circle.position.z = character.z;
+                        circle.position.y = 0.01;
+                        circle.rotation.x = Math.PI * (1 / 2);
+                        setInterval(() => {
+                            circle.dispose();
+                        }, 1500);
+                    }
                 }
 
                 // a player disconnects

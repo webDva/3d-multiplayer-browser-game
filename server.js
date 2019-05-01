@@ -105,7 +105,7 @@ const CLASSES = {
             crit: config.character.defaultStats.crit * 1.1
         },
         attackA: function (player) {
-            if (player.isAlive && Date.now() - player.combat.attackATime > 1500) {
+            if (player.isAlive && Date.now() - player.combat.attackATime > 800) {
                 const projectile = {
                     x: player.x,
                     z: player.z,
@@ -120,6 +120,7 @@ const CLASSES = {
                 player.game.projectiles.push(projectile);
                 player.combat.attackATime = Date.now();
                 player.game.addDelayedBroadcast(createBinaryFrame(5, [
+                    { type: 'Uint8', value: 11 }, // mage class 1 attack 1
                     { type: 'Float32', value: projectile.x },
                     { type: 'Float32', value: projectile.z },
                     { type: 'Float32', value: projectile.angle },
@@ -139,7 +140,37 @@ const CLASSES = {
             defense: config.character.defaultStats.defense * 2,
             crit: config.character.defaultStats.crit * 1.2
         },
-        attackA: function (player) { },
+        attackA: function (player) {
+            if (player.isAlive && Date.now() - player.combat.attackATime > 800) {
+                player.game.characters.filter(character => {
+                    return character !== player && pointInCircleCollision(character, player, 10);
+                })
+                    .forEach(character => {
+                        const damage = calculateDamage(player.stats.attack, character.stats.defense, Math.floor(Math.random() * (9 - 2 + 1) + 2), player.stats.crit);
+                        character.health -= damage;
+
+                        player.game.addDelayedTransmitPlayer(createBinaryFrame(7, [
+                            { type: 'Uint8', value: 0 }, // damage done by the attacking player
+                            { type: 'Uint32', value: damage },
+                            { type: 'Uint32', value: character.id } // target to display damage text above
+                        ]), player);
+
+                        if (character.isHumanPlayer) {
+                            player.game.addDelayedTransmitPlayer(createBinaryFrame(7, [
+                                { type: 'Uint8', value: 1 }, // damage done to the player
+                                { type: 'Uint32', value: damage }
+                            ]), character);
+                        }
+                    });
+
+                player.combat.attackATime = Date.now();
+
+                player.game.addDelayedBroadcast(createBinaryFrame(5, [
+                    { type: 'Uint8', value: 21 }, // warrior class 2 attack 1
+                    { type: 'Uint32', value: player.id }
+                ]));
+            }
+        },
         attackB: function (player) { }
     },
 
@@ -474,10 +505,6 @@ class Game {
                                 { type: 'Uint32', value: damage }
                             ]), character);
                         }
-
-                        if (character.health <= 0) {
-                            character.isAlive = false;
-                        }
                     }
 
                     this.projectiles.splice(this.projectiles.indexOf(projectile), 1);
@@ -486,7 +513,12 @@ class Game {
         });
 
         // dead characters handling system
-        this.characters.filter(character => { return !character.isAlive; })
+        this.characters.filter(character => {
+            if (character.health <= 0) {
+                character.isAlive = false;
+                return true;
+            }
+        })
             .forEach(character => {
                 if (character.isHumanPlayer) {
                     this.addDelayedBroadcast(createBinaryFrame(6, [{ type: 'Uint32', value: character.id }]), character.websocket);
