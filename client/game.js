@@ -43,7 +43,16 @@ class Game {
                     staffMesh.position.x = 2;
                     staffMesh.position.y = 1;
                     staffMesh.parent = mesh;
-                    mesh.staffWeapon = staffMesh;
+                    mesh.classWeapon = staffMesh;
+                });
+            } else if (classNumber === 2) {
+                BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'hammer.babylon', this.scene).then((imported) => {
+                    const hammerMesh = imported.meshes[0];
+                    hammerMesh.position.z = -2;
+                    hammerMesh.position.y = 1;
+                    hammerMesh.rotation.z = Math.PI * (1 / 4);
+                    hammerMesh.parent = mesh;
+                    mesh.classWeapon = hammerMesh;
                 });
             }
 
@@ -268,7 +277,7 @@ class Game {
                     };
                     this.projectiles.push(projectile);
 
-                    const staff = this.characters.find(character => character.id === projectile.owner).mesh.staffWeapon;
+                    const staff = this.characters.find(character => character.id === projectile.owner).mesh.classWeapon;
 
                     const mageAttackAAnimation = new BABYLON.Animation('', 'rotation.x', 15, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_RELATIVE);
                     mageAttackAAnimation.setKeys([{ frame: 10, value: Math.PI * (1 / 2) }, { frame: 20, value: 0 }]);

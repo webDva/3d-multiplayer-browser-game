@@ -25,7 +25,7 @@ class Client {
         }
 
         this.websocket.onopen = () => {
-            this.websocket.send(JSON.stringify({ type: 'join' }));
+            this.websocket.send(JSON.stringify({ type: 'join', class: Math.floor(Math.random() * 3 + 1) }));
         };
 
         setInterval(() => {
