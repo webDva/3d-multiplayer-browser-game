@@ -372,7 +372,8 @@ class Game {
                     const damageTextMaterial = new BABYLON.StandardMaterial('', this.scene);
                     damageTextMaterial.diffuseTexture = damageTextDynamicTexture;
                     damageTextMaterial.backFaceCulling = false;
-                    damageTextMaterial.diffuseColor = BABYLON.Color3.White();
+                    damageTextMaterial.emissiveColor = BABYLON.Color3.White();
+                    damageTextMaterial.diffuseColor = BABYLON.Color3.Black();
                     damageTextMaterial.specularColor = BABYLON.Color3.Black();
 
                     const damageTextPlane = BABYLON.MeshBuilder.CreatePlane('', { width: planeWidth, height: planeHeight, subdivisions: 4 }, this.scene);
