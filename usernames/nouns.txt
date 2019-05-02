@@ -91,3 +91,14 @@ alien
 citizen
 parking
 chief
+summoning
+kawaii
+toast
+critical
+beckon
+taste
+score
+bow
+variable
+constant
+solution
