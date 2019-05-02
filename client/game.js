@@ -138,6 +138,7 @@ class Game {
                 const nameTextMaterial = new BABYLON.StandardMaterial('', this.scene);
                 nameTextMaterial.diffuseTexture = nameDynamicTexture;
                 nameTextMaterial.backFaceCulling = false;
+                nameTextMaterial.emissiveColor = BABYLON.Color3.White();
                 nameTextMaterial.diffuseColor = BABYLON.Color3.Black();
                 nameTextMaterial.specularColor = BABYLON.Color3.Black();
 
@@ -177,7 +178,7 @@ class Game {
         // comment out when not using
         //this.scene.debugLayer.show();
 
-        this.scene.clearColor = new BABYLON.Color3(1, 1, 1);
+        this.scene.clearColor = new BABYLON.Color3(0.5, 0.5, 0.5);
 
         this.camera = new BABYLON.FollowCamera('camera', new BABYLON.Vector3(0, 0, 0), this.scene);
         //const camera = new BABYLON.UniversalCamera('camera', new BABYLON.Vector3(0, 0, 0), scene);
