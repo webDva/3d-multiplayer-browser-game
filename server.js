@@ -59,7 +59,7 @@ const config = {
     physicsTickRate: 1000 / 15,
     character: {
         defaultSpeed: 1,
-        collisionBoxSize: 3, // a square
+        collisionBoxSize: 2, // a square
         defaultStats: {
             maxHealth: 100,
             attack: 10,
@@ -647,6 +647,7 @@ class Character {
      * @param {Number} x The target location's x coordinate
      * @param {Number} z The target location's z coordinate
      * @param {Number} distanceThreshold how far from the target
+     * @return {boolean} `true` if is moving, `false` if not moving
      */
     moveTo(x, z, distanceThreshold = 3) {
         const movementDistanceThreshold = this.speed; // how far from an axis
@@ -664,7 +665,11 @@ class Character {
                     this.move(CONSTANTS.MOVEMENT.UP);
                 }
             }
+
+            return true;
         }
+
+        return false;
     }
 
     reset() {
@@ -719,6 +724,18 @@ class NPC extends Character {
                 target = aggroPair.player;
             }
         });
+
+        // NPC-NPC collision detection and anti-overlapping
+        this.game.characters.filter(character => {
+            return (!character.isHumanPlayer && character.isAlive && character !== this);
+        })
+            .forEach(fellowNPC => {
+                if (AABBCollision(this, fellowNPC, { x: this.speed, z: this.speed })) {
+                    // the mobile NPC will move to the left or right of the fellow NPC
+                    this.angle += (Math.random() < 0.5 ? -1 : 1) * (Math.PI * (1 / 2));
+                    this.isMoving = true;
+                }
+            });
 
         // chase the target with the highest aggro
         this.moveTo(target.x, target.z);
