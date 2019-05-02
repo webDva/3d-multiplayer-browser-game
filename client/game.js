@@ -292,14 +292,40 @@ class Game {
                 if (dataview.getUint8(0) === 5 && dataview.getUint8(1) === 21) {
                     const character = this.characters.find(character => character.id === dataview.getUint32(2));
                     if (character) {
-                        const circle = BABYLON.MeshBuilder.CreateDisc('', { radius: 10 }, this.scene);
-                        circle.position.x = character.x;
-                        circle.position.z = character.z;
-                        circle.position.y = 0.01;
-                        circle.rotation.x = Math.PI * (1 / 2);
-                        setInterval(() => {
-                            circle.dispose();
-                        }, 1500);
+                        character.mesh.classWeapon.position.z = 2;
+                        character.mesh.classWeapon.position.y = 0;
+                        character.mesh.classWeapon.rotation.z = 0;
+                        character.mesh.classWeapon.rotation.x = Math.PI * (1.5 / 2);
+
+                        const warriorAttackAnimation = new BABYLON.Animation('', 'position.y', 30, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_RELATIVE);
+                        warriorAttackAnimation.setKeys([{ frame: 10, value: 5 }, { frame: 20, value: 0 }]);
+                        character.mesh.animations = [warriorAttackAnimation];
+                        this.scene.beginAnimation(character.mesh, 0, 20, false, 1, () => {
+                            character.mesh.classWeapon.position.z = -2;
+                            character.mesh.classWeapon.position.y = 1;
+                            character.mesh.classWeapon.rotation.z = Math.PI * (1 / 4);
+                            character.mesh.classWeapon.rotation.x = 0;
+                        });
+
+                        const warriorAttackAParticleSystem = new BABYLON.ParticleSystem('', 2000, this.scene);
+                        warriorAttackAParticleSystem.particleTexture = new BABYLON.Texture('/assets/particle_texture.png', this.scene);
+                        warriorAttackAParticleSystem.emitter = new BABYLON.Vector3(character.mesh.position.x + Math.sin(character.mesh.rotation.y) * 5, 0, character.mesh.position.z + Math.cos(character.mesh.rotation.y) * 5);
+                        warriorAttackAParticleSystem.blendMode = BABYLON.ParticleSystem.BLENDMODE_MULTIPLYADD;
+                        warriorAttackAParticleSystem.color1 = new BABYLON.Color4(0.7, 0.8, 0.1, 1.0);
+                        warriorAttackAParticleSystem.color2 = new BABYLON.Color4(0.9, 0.5, 0.3, 1.0);
+                        warriorAttackAParticleSystem.colorDead = new BABYLON.Color4(1, 0, 0.2, 0.5);
+                        warriorAttackAParticleSystem.minSize = 0.1;
+                        warriorAttackAParticleSystem.maxSize = 1.4;
+                        warriorAttackAParticleSystem.minLifeTime = 0.3;
+                        warriorAttackAParticleSystem.maxLifeTime = 1.2;
+                        warriorAttackAParticleSystem.emitRate = 1000;
+                        warriorAttackAParticleSystem.minEmitPower = 12;
+                        warriorAttackAParticleSystem.maxEmitPower = 15;
+                        warriorAttackAParticleSystem.gravity = new BABYLON.Vector3(0, -50, 0);
+                        warriorAttackAParticleSystem.updateSpeed = 0.05;
+                        warriorAttackAParticleSystem.createConeEmitter(10, Math.PI * (1 / 2));
+                        warriorAttackAParticleSystem.start();
+                        warriorAttackAParticleSystem.targetStopDuration = 1;
                     }
                 }
 
