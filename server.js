@@ -725,20 +725,19 @@ class NPC extends Character {
             }
         });
 
-        // NPC-NPC collision detection and anti-overlapping
-        this.game.characters.filter(character => {
-            return (!character.isHumanPlayer && character.isAlive && character !== this);
-        })
-            .forEach(fellowNPC => {
-                if (AABBCollision(this, fellowNPC, { x: this.speed, z: this.speed })) {
-                    // the mobile NPC will move to the left or right of the fellow NPC
-                    this.angle += (Math.random() < 0.5 ? -1 : 1) * (Math.PI * (1 / 2));
-                    this.isMoving = true;
-                }
-            });
-
         // chase the target with the highest aggro
-        this.moveTo(target.x, target.z);
+        if (this.moveTo(target.x, target.z)) {
+            // NPC-NPC collision detection and anti-overlapping
+            this.game.characters.filter(character => {
+                return (!character.isHumanPlayer && character.isAlive && character !== this);
+            })
+                .forEach(fellowNPC => {
+                    if (AABBCollision(this, fellowNPC, { x: this.speed, z: this.speed })) {
+                        // the mobile NPC will move to the left or right of the fellow NPC
+                        this.angle += (Math.random() < 0.5 ? -1 : 1) * (Math.PI * (1 / 2));
+                    }
+                });
+        }
     }
 
     // loop function

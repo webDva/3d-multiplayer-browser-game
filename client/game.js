@@ -347,6 +347,7 @@ class Game {
                 // game over
                 if (dataview.getUint8(0) === 8) {
                     document.getElementById('game-over').style.display = 'block';
+                    this.domUIContainer.style.display = 'none';
                 }
 
                 // no player deaths for now
@@ -362,11 +363,17 @@ class Game {
 
         // display DOM user interface
 
+        this.domUIContainer = document.getElementById('dom-ui-container');
+        this.domUIContainer.style.display = 'block';
+
+        // touch screen
+        this.touchScreenContainer = document.getElementById('touch-screen-container');
+
         if (this.isTouchScreen) {
+            this.touchScreenContainer.style.display = 'block';
+
             // virtual d-pad
             const virtualDPad = document.getElementById('virtualDPad');
-            virtualDPad.style.display = 'block';
-            document.getElementById('virtualDPad-image').style.display = 'block';
 
             virtualDPad.onpointerdown = virtualDPad.onpointermove = (event) => {
                 const bounds = event.target.getBoundingClientRect();
@@ -402,8 +409,6 @@ class Game {
             };
 
             // attack buttons
-
-            document.getElementById('attack-buttons-container').style.display = 'block';
 
             const aButton = document.getElementById('a-button');
 

@@ -16,22 +16,26 @@
 </head>
 
 <body>
-    <div id="attack-buttons-container" class="dom-ui">
-        <img id="a-button-image" class="attack-button a-button touch-screen" src="./assets/abutton.png"></img>
-        <div id="a-button" class="attack-button a-button"></div>
+    <div id="dom-ui-container">
+        <div id="touch-screen-container">
+            <div id="attack-buttons-container" class="dom-ui">
+                <img id="a-button-image" class="attack-button a-button touch-screen" src="./assets/abutton.png"></img>
+                <div id="a-button" class="attack-button a-button"></div>
 
-        <img id="b-button-image" class="attack-button b-button touch-screen" src="./assets/bbutton.png"></img>
-        <div id="b-button" class="attack-button b-button"></div>
+                <img id="b-button-image" class="attack-button b-button touch-screen" src="./assets/bbutton.png"></img>
+                <div id="b-button" class="attack-button b-button"></div>
+            </div>
+
+            <img class="dom-ui virtualDPad touch-screen" src="./assets/dpad.png"></img>
+            <div id="virtualDPad" class="dom-ui virtualDPad touch-screen"></div>
+        </div>
     </div>
-
-    <img id="virtualDPad-image" class="dom-ui virtualDPad touch-screen" src="./assets/dpad.png"></img>
-    <div id="virtualDPad" class="dom-ui virtualDPad touch-screen"></div>
 
     <div id="main-menu">
         <div id="login-container">
             <p id="select-mage" class="class-selection">Mage</p>
             <p id="select-warrior" class="class-selection">Warrior</p>
-            <p id="select-archer" class="class-selection">Archer</p>
+            <p id="select-archer" class="class-selection">Archer (not available yet)</p>
 
             <button id="play-button">Play</button>
         </div>

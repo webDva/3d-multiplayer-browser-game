@@ -72,15 +72,23 @@ html, body {
     overflow: hidden;
 }
 
-.dom-ui {
-    z-index: 1;
+#dom-ui-container {
     display: none;
+    z-index: 1;
+}
+
+.dom-ui {
     position: fixed;
 }
 
 .flex-container {
     justify-content: center;
     align-items: center;
+}
+
+#touch-screen-container {
+    display: none;
+    z-index: 1;
 }
 
 .touch-screen {
