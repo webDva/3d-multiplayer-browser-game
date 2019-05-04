@@ -249,7 +249,7 @@ class Game {
                 // mage attack A
                 if (dataview.getUint8(0) === 5 && dataview.getUint8(1) === 11) {
                     const projectile = {
-                        particleSystem: create_particles(dataview.getFloat32(2), dataview.getFloat32(6)),
+                        particleSystem: create_particles(dataview.getFloat32(2), dataview.getFloat32(6), 1),
                         forwardVector: dataview.getFloat32(10),
                         creationTime: Date.now(),
                         speed: dataview.getFloat32(14),
@@ -286,6 +286,22 @@ class Game {
                         warriorAttackAParticleSystem.start();
                         warriorAttackAParticleSystem.targetStopDuration = 1;
                     }
+                }
+
+                // archer attack A
+                if (dataview.getUint8(0) === 5 && dataview.getUint8(1) === 31) {
+                    const projectile = {
+                        particleSystem: create_particles(dataview.getFloat32(2), dataview.getFloat32(6), 2),
+                        forwardVector: dataview.getFloat32(10),
+                        creationTime: Date.now(),
+                        speed: dataview.getFloat32(14),
+                        owner: dataview.getUint32(18),
+                        collisionBoxSize: 2,
+                        x: dataview.getFloat32(2),
+                        z: dataview.getFloat32(6),
+                        type: null
+                    };
+                    this.projectiles.push(projectile);
                 }
 
                 // a player disconnects
@@ -601,13 +617,24 @@ class Player {
 }
 
 // particle system handling subsystem
-function create_particles(xPosition, zPosition) {
+function create_particles(xPosition, zPosition, attackType) {
     const particleSystem = new BABYLON.ParticleSystem('', 500, this.scene);
 
     particleSystem.particleTexture = new BABYLON.Texture('/assets/particle_texture.png', this.scene);
-    particleSystem.color1 = new BABYLON.Color4(1, 0, 0, 1);
-    particleSystem.color2 = new BABYLON.Color4(1, 1, 1, 1);
-    particleSystem.colorDead = new BABYLON.Color4(0, 0, 0, 0);
+
+    switch (attackType) {
+        case 1: // mage attack A
+            particleSystem.color1 = new BABYLON.Color4(1, 0, 0, 1);
+            particleSystem.color2 = new BABYLON.Color4(1, 1, 1, 1);
+            particleSystem.colorDead = new BABYLON.Color4(0, 0, 0, 0);
+            break;
+        case 2: // archer attack A
+            particleSystem.color1 = new BABYLON.Color4(0, 1, 0, 1);
+            particleSystem.color2 = new BABYLON.Color4(1, 1, 1, 1);
+            particleSystem.colorDead = new BABYLON.Color4(0, 0.5, 0.5, 1);
+            break;
+    }
+
     particleSystem.minSize = 0.1;
     particleSystem.maxSize = 1.2;
     particleSystem.minLifeTime = 0.1;

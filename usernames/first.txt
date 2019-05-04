@@ -104,3 +104,5 @@ rocket
 laser
 armored
 cat
+space
+orbiting

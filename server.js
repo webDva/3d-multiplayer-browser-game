@@ -168,7 +168,38 @@ const CLASSES = {
             defense: config.character.defaultStats.defense * 1.5,
             crit: config.character.defaultStats.crit * 5 + 2
         },
-        attackA: function (player) { },
+        attackA: function (player) {
+            if (player.isAlive && Date.now() - player.combat.attackATime > 800) {
+                const archerProjectiles = [];
+                for (let i = 0; i < 3; i++) {
+                    archerProjectiles.push({
+                        x: player.x,
+                        z: player.z,
+                        angle: player.angle + (Math.PI * (1 / 8) * i) - (Math.PI * (1 / 8)),
+                        speed: 5,
+                        creationTime: Date.now(),
+                        owner: player.id,
+                        collisionBoxSize: 2,
+                        baseDamage: 5,
+                        type: null
+                    });
+                }
+
+                archerProjectiles.forEach(projectile => {
+                    player.game.projectiles.push(projectile);
+                    player.game.addDelayedBroadcast(createBinaryFrame(5, [
+                        { type: 'Uint8', value: 31 }, // archer class 1 attack 1
+                        { type: 'Float32', value: projectile.x },
+                        { type: 'Float32', value: projectile.z },
+                        { type: 'Float32', value: projectile.angle },
+                        { type: 'Float32', value: projectile.speed },
+                        { type: 'Uint32', value: projectile.owner }
+                    ]));
+                });
+
+                player.combat.attackATime = Date.now();
+            }
+        },
         attackB: function (player) { }
     }
 };
