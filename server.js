@@ -146,21 +146,7 @@ const CLASSES = {
                     return character !== player && pointInCircleCollision(character, { x: player.x + Math.sin(player.angle) * 5, z: player.z + Math.cos(player.angle) * 5 }, 10);
                 })
                     .forEach(character => {
-                        const damage = calculateDamage(player.stats.attack, character.stats.defense, Math.floor(Math.random() * (9 - 2 + 1) + 2), player.stats.crit);
-                        character.health -= damage;
-
-                        player.game.addDelayedTransmitPlayer(createBinaryFrame(7, [
-                            { type: 'Uint8', value: 0 }, // damage done by the attacking player
-                            { type: 'Uint32', value: damage },
-                            { type: 'Uint32', value: character.id } // target to display damage text above
-                        ]), player);
-
-                        if (character.isHumanPlayer) {
-                            player.game.addDelayedTransmitPlayer(createBinaryFrame(7, [
-                                { type: 'Uint8', value: 1 }, // damage done to the player
-                                { type: 'Uint32', value: damage }
-                            ]), character);
-                        }
+                        character.takeDamage(calculateDamage(player.stats.attack, character.stats.defense, Math.floor(Math.random() * (9 - 2 + 1) + 2), player.stats.crit), player);
                     });
 
                 player.combat.attackATime = Date.now();
@@ -488,25 +474,10 @@ class Game {
                 if (projectile.owner !== character.id && character.isAlive && AABBCollision(projectile, character)) {
                     const attacker = this.characters.find(potentialAttacker => potentialAttacker.id === projectile.owner);
                     if (attacker) {
-                        const damage = calculateDamage(attacker.stats.attack, character.stats.defense, projectile.baseDamage, attacker.stats.crit);
-                        character.health -= damage;
-
-                        if (attacker.isHumanPlayer) {
-                            this.addDelayedTransmitPlayer(createBinaryFrame(7, [
-                                { type: 'Uint8', value: 0 }, // damage done by the attaker
-                                { type: 'Uint32', value: damage },
-                                { type: 'Uint32', value: character.id } // target to display damage text above
-                            ]), attacker);
-                        }
-
-                        if (character.isHumanPlayer) {
-                            this.addDelayedTransmitPlayer(createBinaryFrame(7, [
-                                { type: 'Uint8', value: 1 }, // damage done to the player
-                                { type: 'Uint32', value: damage }
-                            ]), character);
-                        }
+                        character.takeDamage(calculateDamage(attacker.stats.attack, character.stats.defense, projectile.baseDamage, attacker.stats.crit), attacker);
                     }
 
+                    // should use a for loop instead
                     this.projectiles.splice(this.projectiles.indexOf(projectile), 1);
                 }
             });
@@ -682,6 +653,25 @@ class Character {
         this.combat = {};
         this.x = Math.random() * (game.mapSize - this.collisionBoxSize);
         this.z = Math.random() * (game.mapSize - this.collisionBoxSize);
+    }
+
+    takeDamage(damage, attacker) {
+        this.health -= damage;
+
+        if (attacker.isHumanPlayer) {
+            this.game.addDelayedTransmitPlayer(createBinaryFrame(7, [
+                { type: 'Uint8', value: 0 }, // damage done by the attacking player
+                { type: 'Uint32', value: damage },
+                { type: 'Uint32', value: this.id } // target to display damage text above
+            ]), attacker);
+        }
+
+        if (this.isHumanPlayer) {
+            this.game.addDelayedTransmitPlayer(createBinaryFrame(7, [
+                { type: 'Uint8', value: 1 }, // damage done to the player
+                { type: 'Uint32', value: damage }
+            ]), this);
+        }
     }
 }
 
