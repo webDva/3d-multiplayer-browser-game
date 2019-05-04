@@ -342,7 +342,6 @@ class Game {
                         const position = this.characters.find(character => character.id === targetId).mesh.position;
                         damageText = new OnscreenText(damage, position.x, position.y, position.z, 20, 'Arial', 'yellow', 1.5, this.scene);
                     } else if (dataview.getUint8(1) === 1) { // damage done to the player
-                        damageTextDynamicTexture.drawText(damage, null, null, font, 'red', null);
                         const position = this.player.mesh.position;
                         damageText = new OnscreenText(damage, position.x, position.y, position.z, 20, 'Arial', 'red', 1.5, this.scene);
                     }
