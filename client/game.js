@@ -182,7 +182,7 @@ class Game {
         this.light = new BABYLON.HemisphericLight('light', new BABYLON.Vector3(groundSize / 2, 100, groundSize / 2), this.scene);
         this.light.diffuse = new BABYLON.Color3(1, 1, 1);
         this.light.specular = new BABYLON.Color3(0, 0, 0);
-        this.light.groundColor = new BABYLON.Color3(1, 1, 1);
+        this.light.groundColor = new BABYLON.Color3(0, 0, 0);
 
         // aggro icon sprite manager
         this.aggroIconSpriteManager = new BABYLON.SpriteManager('aggroSpriteManager', './assets/aggro_icon.png', 100, { width: 64, height: 64 }, this.scene);
