@@ -143,7 +143,7 @@ const CLASSES = {
         attackA: function (player) {
             if (player.isAlive && Date.now() - player.combat.attackATime > 800) {
                 player.game.characters.filter(character => {
-                    return character !== player && pointInCircleCollision(character, { x: player.x + Math.sin(player.angle) * 5, z: player.z + Math.cos(player.angle) * 5 }, 10);
+                    return character !== player && pointInCircleCollision(character, player, 10);
                 })
                     .forEach(character => {
                         character.takeDamage(calculateDamage(player.stats.attack, character.stats.defense, Math.floor(Math.random() * (9 - 2 + 1) + 2), player.stats.crit), player);

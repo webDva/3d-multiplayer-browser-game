@@ -260,38 +260,15 @@ class Game {
                         type: null
                     };
                     this.projectiles.push(projectile);
-
-                    const staff = this.characters.find(character => character.id === projectile.owner).mesh.classWeapon;
-
-                    const mageAttackAAnimation = new BABYLON.Animation('', 'rotation.x', 25, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_RELATIVE);
-                    mageAttackAAnimation.setKeys([{ frame: 10, value: Math.PI * (1 / 2) }, { frame: 20, value: 0 }]);
-                    staff.animations = [mageAttackAAnimation];
-                    this.scene.beginAnimation(staff, 0, 20, false, 1);
                 }
 
                 // warrior attack A
                 if (dataview.getUint8(0) === 5 && dataview.getUint8(1) === 21) {
                     const character = this.characters.find(character => character.id === dataview.getUint32(2));
                     if (character) {
-                        character.mesh.classWeapon.position.z = 2;
-                        character.mesh.classWeapon.position.y = 0;
-                        character.mesh.classWeapon.rotation.z = 0;
-                        character.mesh.classWeapon.rotation.x = Math.PI * (1.5 / 2);
-
-                        const warriorAttackAnimation = new BABYLON.Animation('', 'position.y', 30, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_RELATIVE);
-                        warriorAttackAnimation.setKeys([{ frame: 10, value: 5 }, { frame: 20, value: 0 }]);
-                        character.mesh.animations = [warriorAttackAnimation];
-                        this.scene.beginAnimation(character.mesh, 0, 20, false, 1, () => {
-                            character.mesh.classWeapon.position.z = -2;
-                            character.mesh.classWeapon.position.y = 1;
-                            character.mesh.classWeapon.rotation.z = Math.PI * (1 / 4);
-                            character.mesh.classWeapon.rotation.x = 0;
-                            character.mesh.idleRange.animation = this.scene.beginAnimation(character.mesh.skeleton, character.mesh.idleRange.from, character.mesh.idleRange.to, true, 1);
-                        });
-
                         const warriorAttackAParticleSystem = new BABYLON.ParticleSystem('', 2000, this.scene);
                         warriorAttackAParticleSystem.particleTexture = new BABYLON.Texture('/assets/particle_texture.png', this.scene);
-                        warriorAttackAParticleSystem.emitter = new BABYLON.Vector3(character.mesh.position.x + Math.sin(character.mesh.rotation.y) * 5, 0, character.mesh.position.z + Math.cos(character.mesh.rotation.y) * 5);
+                        warriorAttackAParticleSystem.emitter = new BABYLON.Vector3(character.mesh.position.x, 0, character.mesh.position.z);
                         warriorAttackAParticleSystem.blendMode = BABYLON.ParticleSystem.BLENDMODE_MULTIPLYADD;
                         warriorAttackAParticleSystem.color1 = new BABYLON.Color4(0.7, 0.8, 0.1, 1.0);
                         warriorAttackAParticleSystem.color2 = new BABYLON.Color4(0.9, 0.5, 0.3, 1.0);
