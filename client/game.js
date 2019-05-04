@@ -26,6 +26,8 @@ class Game {
         BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'cutie.babylon', this.scene).then((imported) => {
             const mesh = imported.meshes[0];
 
+            addOutline(mesh);
+
             mesh.material.subMaterials[0] = new BABYLON.StandardMaterial('', this.scene);;
             mesh.material.subMaterials[1] = new BABYLON.StandardMaterial('', this.scene);;
 
@@ -40,6 +42,7 @@ class Game {
             if (classNumber === 1) {
                 BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'staff.babylon', this.scene).then((imported) => {
                     const staffMesh = imported.meshes[0];
+                    addOutline(staffMesh);
                     staffMesh.position.x = 2;
                     staffMesh.position.y = 1;
                     staffMesh.parent = mesh;
@@ -48,6 +51,7 @@ class Game {
             } else if (classNumber === 2) {
                 BABYLON.SceneLoader.ImportMeshAsync(null, './assets/', 'hammer.babylon', this.scene).then((imported) => {
                     const hammerMesh = imported.meshes[0];
+                    addOutline(hammerMesh);
                     hammerMesh.position.z = -2;
                     hammerMesh.position.y = 1;
                     hammerMesh.rotation.z = Math.PI * (1 / 4);
@@ -169,10 +173,16 @@ class Game {
         this.ground.material.gridRatio = 1;
         this.ground.material.majorUnitFrequency = 2;
 
-        // light
-        this.light = new BABYLON.PointLight('light', new BABYLON.Vector3(groundSize / 2, 100, groundSize / 2), this.scene);
+        // point light
+        // this.light = new BABYLON.PointLight('light', new BABYLON.Vector3(groundSize / 2, 100, groundSize / 2), this.scene);
+        // this.light.diffuse = new BABYLON.Color3(1, 1, 1);
+        // this.light.specular = new BABYLON.Color3(1, 1, 1);
+
+        // hemispeheric light
+        this.light = new BABYLON.HemisphericLight('light', new BABYLON.Vector3(groundSize / 2, 100, groundSize / 2), this.scene);
         this.light.diffuse = new BABYLON.Color3(1, 1, 1);
-        this.light.specular = new BABYLON.Color3(1, 1, 1);
+        this.light.specular = new BABYLON.Color3(0, 0, 0);
+        this.light.groundColor = new BABYLON.Color3(1, 1, 1);
 
         // aggro icon sprite manager
         this.aggroIconSpriteManager = new BABYLON.SpriteManager('aggroSpriteManager', './assets/aggro_icon.png', 100, { width: 64, height: 64 }, this.scene);
@@ -276,6 +286,7 @@ class Game {
                             character.mesh.classWeapon.position.y = 1;
                             character.mesh.classWeapon.rotation.z = Math.PI * (1 / 4);
                             character.mesh.classWeapon.rotation.x = 0;
+                            character.mesh.idleRange.animation = this.scene.beginAnimation(character.mesh.skeleton, character.mesh.idleRange.from, character.mesh.idleRange.to, true, 1);
                         });
 
                         const warriorAttackAParticleSystem = new BABYLON.ParticleSystem('', 2000, this.scene);
@@ -706,4 +717,10 @@ class OnscreenText {
         this.textPlane.dispose();
         this.textMaterial.dispose();
     }
+}
+
+function addOutline(mesh) {
+    mesh.renderOutline = true;
+    mesh.outlineColor = new BABYLON.Color3(0, 0, 0);
+    mesh.outlineWidth = 0.08;
 }
