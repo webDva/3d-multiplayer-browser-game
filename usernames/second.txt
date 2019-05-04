@@ -131,3 +131,6 @@ texture
 transform
 dragon
 electron
+armor
+block
+cube

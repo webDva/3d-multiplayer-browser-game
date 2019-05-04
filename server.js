@@ -180,8 +180,8 @@ httpServer.listen(PORT, function () {
     console.log(`HTTP server started on port ${PORT}.`);
 });
 
-const adjectives = fs.readFileSync('./usernames/adjectives.txt').toString().split('\n');
-const nouns = fs.readFileSync('./usernames/nouns.txt').toString().split('\n');
+const firstNames = fs.readFileSync('./usernames/first.txt').toString().split('\n');
+const secondNames = fs.readFileSync('./usernames/second.txt').toString().split('\n');
 
 function stringToArrayBuffer(string) {
     const arraybuffer = new Uint8Array(string.length);
@@ -788,9 +788,9 @@ class Player extends Character {
         this.health = this.stats.maxHealth;
         this.combat.attackATime = this.combat.attackBTime = 0;
 
-        let firstName = adjectives[parseInt(Math.random() * adjectives.length)];
+        let firstName = firstNames[parseInt(Math.random() * firstNames.length)];
         firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
-        let secondName = nouns[parseInt(Math.random() * nouns.length)];
+        let secondName = secondNames[parseInt(Math.random() * secondNames.length)];
         secondName = secondName.charAt(0).toUpperCase() + secondName.slice(1);
         this.name = firstName + secondName + Math.floor(Math.random() * 9999 + 1).toString();
         this.binaryName = stringToArrayBuffer(this.name);
