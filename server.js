@@ -702,6 +702,13 @@ class Character {
                 { type: 'Uint8', value: 1 }, // damage done to the player
                 { type: 'Uint32', value: damage }
             ]), this);
+        } else {
+            const aggroPair = this.aggroTable.find(aggroPair => aggroPair.player === attacker);
+            if (aggroPair) {
+                aggroPair.aggro += damage;
+            } else {
+                this.aggroTable.push({ player: attacker, aggro: damage });
+            }
         }
     }
 }
