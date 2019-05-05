@@ -724,6 +724,8 @@ class NPC extends Character {
         this.leashLocation = { x: this.x, z: this.z };
         this.leashRadius = 40;
         this.isDeaggroing = false;
+
+        this.combat.attackTime = 0;
     }
 
     // NPC aggro initiation/human player detection by NPC
@@ -765,6 +767,12 @@ class NPC extends Character {
                         this.angle += (Math.random() < 0.5 ? -1 : 1) * (Math.PI * (1 / 2));
                     }
                 });
+        } else { // attack the player
+            if (Date.now() - this.combat.attackTime > 2000) {
+                this.combat.attackTime = Date.now();
+                target.takeDamage(1, this);
+                this.game.addDelayedBroadcast(createBinaryFrame(10, [{ type: 'Uint32', value: this.id }]));
+            }
         }
     }
 
@@ -811,6 +819,8 @@ class NPC extends Character {
         this.speed = 0.9;
         this.leashLocation = { x: this.x, z: this.z };
         this.isDeaggroing = false;
+
+        this.combat.attackTime = 0;
     }
 }
 
