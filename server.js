@@ -651,7 +651,7 @@ class Character {
      * @param {Number} distanceThreshold how far from the target
      * @return {boolean} `true` if is moving, `false` if not moving
      */
-    moveTo(x, z, distanceThreshold = 3) {
+    moveTo(x, z, distanceThreshold = 5) {
         const movementDistanceThreshold = this.speed; // how far from an axis
         if (Math.abs(x - this.x) > distanceThreshold || Math.abs(z - this.z) > distanceThreshold) { // has not yet arrived at target location
             if (Math.abs(x - this.x) > movementDistanceThreshold) {
@@ -800,7 +800,7 @@ class NPC extends Character {
                 this.aggroScan();
             }
         } else {
-            if (!pointInCircleCollision(this, this.leashLocation, this.leashRadius * (1 / 10))) {
+            if (this.moveTo(this.leashLocation.x, this.leashLocation.z)) {
                 this.moveTo(this.leashLocation.x, this.leashLocation.z);
             } else {
                 this.isDeaggroing = false;
@@ -866,11 +866,7 @@ function calculateDamage(attack, defense, baseDamage, critChance) {
  * @return `true` if the point collides with the circle, `false` otherwise. 
  */
 function pointInCircleCollision(point, circle, circleRadius) {
-    if (Math.sqrt(Math.pow(point.x - circle.x, 2) + Math.pow(point.z - circle.z, 2)) <= circleRadius) {
-        return true;
-    } else {
-        return false;
-    }
+    return Math.sqrt(Math.pow(point.x - circle.x, 2) + Math.pow(point.z - circle.z, 2)) <= circleRadius;
 }
 
 /**
