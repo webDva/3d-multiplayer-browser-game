@@ -61,10 +61,10 @@ const config = {
         defaultSpeed: 1,
         collisionBoxSize: 2, // a square
         defaultStats: {
-            maxHealth: 100,
+            maxHealth: 10,
             attack: 10,
             defense: 10,
-            crit: 0.01
+            crit: 0.1
         }
     },
     mapSize: 50,
@@ -99,9 +99,9 @@ const CLASSES = {
     MAGE: {
         number: CONSTANTS.CLASS_NUMBERS.MAGE,
         stats: {
-            maxHealth: config.character.defaultStats.maxHealth - 50,
+            maxHealth: config.character.defaultStats.maxHealth * 0.5,
             attack: config.character.defaultStats.attack * 2,
-            defense: config.character.defaultStats.defense - 5,
+            defense: config.character.defaultStats.defense * 0.9,
             crit: config.character.defaultStats.crit * 1.1
         },
         attackA: function (player) {
@@ -136,7 +136,7 @@ const CLASSES = {
         number: CONSTANTS.CLASS_NUMBERS.WARRIOR,
         stats: {
             maxHealth: config.character.defaultStats.maxHealth * 2.5,
-            attack: config.character.defaultStats.attack * 0.9,
+            attack: config.character.defaultStats.attack * 0.3,
             defense: config.character.defaultStats.defense * 2,
             crit: config.character.defaultStats.crit * 1.2
         },
@@ -146,7 +146,7 @@ const CLASSES = {
                     return character !== player && pointInCircleCollision(character, player, 10);
                 })
                     .forEach(character => {
-                        character.takeDamage(calculateDamage(player.stats.attack, character.stats.defense, Math.floor(Math.random() * (9 - 2 + 1) + 2), player.stats.crit), player);
+                        character.takeDamage(calculateDamage(player.stats.attack, character.stats.defense, Math.floor(Math.random() * (8 - 1 + 1) + 1), player.stats.crit), player);
                     });
 
                 player.combat.attackATime = Date.now();
@@ -163,7 +163,7 @@ const CLASSES = {
     ARCHER: {
         number: CONSTANTS.CLASS_NUMBERS.ARCHER,
         stats: {
-            maxHealth: config.character.defaultStats.maxHealth + 50,
+            maxHealth: config.character.defaultStats.maxHealth * 1.4,
             attack: config.character.defaultStats.attack * 1.1,
             defense: config.character.defaultStats.defense * 1.5,
             crit: config.character.defaultStats.crit * 5 + 2
@@ -180,7 +180,7 @@ const CLASSES = {
                         creationTime: Date.now(),
                         owner: player.id,
                         collisionBoxSize: 2,
-                        baseDamage: 5,
+                        baseDamage: 1,
                         type: null
                     });
                 }
@@ -719,7 +719,7 @@ class NPC extends Character {
 
         this.aggroTable = []; // a list of player-aggro pairs (.player and .aggro object names)
         this.aggroRadius = 10;
-        this.speed = 0.9;
+        this.speed = 0.7;
 
         this.leashLocation = { x: this.x, z: this.z };
         this.leashRadius = 40;
