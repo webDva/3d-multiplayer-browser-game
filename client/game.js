@@ -357,10 +357,10 @@ class Game {
                 if (dataview.getUint8(0) === 10) {
                     const mob = this.characters.find(character => character.id === dataview.getUint32(1));
                     if (mob) {
-                        const mobAttackAnimation = new BABYLON.Animation('', 'position.y', 25, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_RELATIVE);
-                        mobAttackAnimation.setKeys([{ frame: 0, value: 0 }, { frame: 10, value: 3 }, { frame: 20, value: 0 }]);
-                        mob.mesh.animations = [mobAttackAnimation];
-                        this.scene.beginAnimation(mob.mesh, 0, 20, false, 1, null, null, false);
+                        const mobAttackAnimationJump = new BABYLON.Animation('', 'position.y', 25, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_RELATIVE);
+                        mobAttackAnimationJump.setKeys([{ frame: 0, value: 0 }, { frame: 10, value: 3 }, { frame: 20, value: 0 }]);
+                        mobAttackAnimationJump.setEasingFunction(new BABYLON.CubicEase());
+                        this.scene.beginDirectAnimation(mob.mesh, [mobAttackAnimationJump], 0, 20, false, 1);
                     }
                 }
             }
