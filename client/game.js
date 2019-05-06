@@ -203,6 +203,8 @@ class Game {
                 // welcome message id sent to the player
                 if (dataview.getUint8(0) === 3) {
                     this.player.id = dataview.getUint32(1);
+                    this.player.maxXP = dataview.getFloat32(5);
+                    this.experienceBar.max = this.player.maxXP;
 
                     // request map data
                     this.websocket.send(JSON.stringify({ type: 'request_map_data' }));
@@ -363,6 +365,55 @@ class Game {
                         this.scene.beginDirectAnimation(mob.mesh, [mobAttackAnimationJump], 0, 20, false, 1);
                     }
                 }
+
+                // XP gain
+                if (dataview.getUint8(0) === 11 && dataview.getUint8(5) === 0) {
+                    const xpGain = dataview.getFloat32(1);
+                    this.player.xp += xpGain;
+                    this.experienceBar.value = this.player.xp;
+
+                    const position = this.player.mesh.position;
+                    const xpText = new OnscreenText(`${xpGain} XP`, position.x, position.y, position.z, 20, 'Arial', 'blue', 1.5, this.scene);
+                    const xpAnimationText = new BABYLON.Animation('', 'position.y', 10, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_RELATIVE);
+                    xpAnimationText.setKeys([{ frame: 0, value: 6 }, { frame: 20, value: 12 }]);
+                    xpText.textPlane.animations = [xpAnimationText];
+                    this.scene.beginAnimation(xpText.textPlane, 0, 20, false, 1, () => {
+                        xpText.dispose();
+                    });
+                }
+
+                // level up
+                if (dataview.getUint8(0) === 11 && dataview.getUint8(5) !== 0) {
+                    const xpGain = dataview.getFloat32(1);
+                    const newLevel = dataview.getUint8(5);
+                    const leftOverXP = dataview.getFloat32(6);
+                    const newMaxXP = dataview.getFloat32(10);
+
+                    this.player.level = newLevel;
+                    this.player.xp = leftOverXP;
+                    this.player.maxXP = newMaxXP;
+
+                    this.experienceBar.max = this.player.maxXP;
+                    this.experienceBar.value = this.player.xp;
+                    this.experienceBarLevel.innerText = this.player.level;
+
+                    const position = this.player.mesh.position;
+                    const levelUpText = new OnscreenText('LEVEL UP! 🍰', position.x + 5, position.y, position.z, 20, 'monospace', 'yellow', 1.5, this.scene);
+                    const levelUpTextAnimation = new BABYLON.Animation('', 'position.y', 10, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_RELATIVE);
+                    levelUpTextAnimation.setKeys([{ frame: 0, value: 6 }, { frame: 20, value: 12 }]);
+                    levelUpText.textPlane.animations = [levelUpTextAnimation];
+                    this.scene.beginAnimation(levelUpText.textPlane, 0, 20, false, 1, () => {
+                        levelUpText.dispose();
+                    });                    
+
+                    const xpText = new OnscreenText(`${xpGain} XP`, position.x, position.y, position.z, 20, 'Arial', 'blue', 1.5, this.scene);
+                    const xpAnimationText = new BABYLON.Animation('', 'position.y', 10, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_RELATIVE);
+                    xpAnimationText.setKeys([{ frame: 0, value: 6 }, { frame: 20, value: 12 }]);
+                    xpText.textPlane.animations = [xpAnimationText];
+                    this.scene.beginAnimation(xpText.textPlane, 0, 20, false, 1, () => {
+                        xpText.dispose();
+                    });                    
+                }
             }
         }
 
@@ -375,6 +426,12 @@ class Game {
 
         this.domUIContainer = document.getElementById('dom-ui-container');
         this.domUIContainer.style.display = 'block';
+
+        // experience bar and level
+        this.experienceBar = document.getElementById('experience-bar');
+        this.experienceBar.value = 0;
+        this.experienceBarLevel = document.getElementById('level-number');
+        this.experienceBarLevel.innerText = 1;
 
         // touch screen
         this.touchScreenContainer = document.getElementById('touch-screen-container');
@@ -620,6 +677,10 @@ class Player {
 
         this.movement = 0;
         this.touchMovement = 0;
+
+        this.level = 1;
+        this.maxXP;
+        this.xp = 0;
     }
 }
 

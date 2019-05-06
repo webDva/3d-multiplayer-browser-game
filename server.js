@@ -343,7 +343,10 @@ ws_server.on('connection', websocket => {
                 websocket.player.websocket = websocket; // for removing a player when their Player object is known
 
                 // send welcome message. the player's id
-                transmit(createBinaryFrame(3, [{ type: 'Uint32', value: websocket.player.id }]), websocket);
+                transmit(createBinaryFrame(3, [
+                    { type: 'Uint32', value: websocket.player.id },
+                    { type: 'Float32', value: websocket.player.maxExperiencePoints }
+                ]), websocket);
 
                 // notify the rest of the room of the new player
                 const message = [
@@ -522,6 +525,35 @@ class Game {
             }
         })
             .forEach(character => {
+                const totalDamage = character.damageTable.reduce((accumulator, currentPair) => accumulator + currentPair.damage, 0);
+                character.damageTable.forEach(damagePair => {
+                    const player = damagePair.player;
+                    const rewardPercentage = damagePair.damage / totalDamage;
+                    const reward = ((character.level / player.level) * ((character.isHumanPlayer) ? 1.5 : 1)) * rewardPercentage;
+
+                    player.experiencePoints += reward;
+
+                    if (player.experiencePoints >= player.maxExperiencePoints) {
+                        const leftOverXP = player.experiencePoints - player.maxExperiencePoints;
+                        player.level += 1;
+                        player.experiencePoints = leftOverXP;
+                        player.maxExperiencePoints = (player.level + 1) * Math.log(player.level + 1);
+                        this.addDelayedTransmitPlayer(createBinaryFrame(11, [
+                            { type: 'Float32', value: reward },
+                            { type: 'Uint8', value: player.level },
+                            { type: 'Float32', value: leftOverXP },
+                            { type: 'Float32', value: player.maxExperiencePoints }
+                        ]), player);
+                    } else {
+                        this.addDelayedTransmitPlayer(createBinaryFrame(11, [
+                            { type: 'Float32', value: reward },
+                            { type: 'Uint8', value: 0 },
+                            { type: 'Float32', value: 0 },
+                            { type: 'Float32', value: 0 }
+                        ]), player);
+                    }
+                });
+
                 if (character.isHumanPlayer) {
                     this.addDelayedBroadcast(createBinaryFrame(6, [{ type: 'Uint32', value: character.id }]), character.websocket);
                     this.addDelayedTransmitPlayer(createBinaryFrame(8, []), character);
@@ -616,6 +648,9 @@ class Character {
 
         this.level = 1;
 
+        // table of damage recieved by other characters. for distributing experience points and scores. a list of pairs with .player and .damage members
+        this.damageTable = [];
+
         game.characters.push(this);
     }
 
@@ -684,12 +719,20 @@ class Character {
         this.combat = {};
         this.x = Math.random() * (game.mapSize - this.collisionBoxSize);
         this.z = Math.random() * (game.mapSize - this.collisionBoxSize);
+        this.damageTable = [];
     }
 
     takeDamage(damage, attacker) {
         this.health -= damage;
 
         if (attacker.isHumanPlayer) {
+            const damagePair = this.damageTable.find(damagePair => damagePair.player === attacker);
+            if (damagePair) {
+                damagePair.damage += damage;
+            } else {
+                this.damageTable.push({ player: attacker, damage: damage });
+            }
+
             this.game.addDelayedTransmitPlayer(createBinaryFrame(7, [
                 { type: 'Uint8', value: 0 }, // damage done by the attacking player
                 { type: 'Uint32', value: damage },
@@ -830,6 +873,7 @@ class Player extends Character {
 
         this.score = 0;
         this.experiencePoints = 0;
+        this.maxExperiencePoints = (this.level + 1) * Math.log(this.level + 1);
 
         this.class = characterClass;
         this.stats = this.class.stats;
