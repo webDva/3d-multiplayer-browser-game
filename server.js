@@ -2,7 +2,6 @@ const express = require('express');
 const app = express();
 const httpServer = require('http').Server(app);
 const WebSocket = require('uws');
-const ws_server = new WebSocket.Server({ server: httpServer });
 const crypto = require('crypto');
 const fs = require('fs');
 
@@ -238,108 +237,10 @@ function randomUint32ID(listOfObjects, usedIDsList) {
     return newID;
 }
 
-function broadcast(data, exception = null) {
-    ws_server.clients.forEach(client => {
-        if (client !== exception && client.readyState === WebSocket.OPEN)
-            client.send(data);
-    });
-}
-
 function transmit(data, websocket) {
     if (websocket.readyState === WebSocket.OPEN)
         websocket.send(data);
 }
-
-function transmitPlayer(data, player) { // for when the player's socket is not known
-    ws_server.clients.forEach(client => { // find the socket that the player belongs to
-        if (client.player === player && client.readyState === WebSocket.OPEN)
-            client.send(data);
-    });
-}
-
-ws_server.on('connection', websocket => {
-    websocket.isAlive = true; // create this property for the sake of implementing ping-pong heartbeats
-
-    websocket.on('message', message => {
-        if (typeof message === 'string') {
-            const data = JSON.parse(message);
-
-            if (data.type === 'join') {
-                websocket.player = game.createHumanPlayer(data.class);
-                websocket.player.websocket = websocket; // for removing a player when their Player object is known
-
-                // send welcome message. the player's id
-                transmit(createBinaryFrame(3, [
-                    { type: 'Uint32', value: websocket.player.id },
-                    { type: 'Float32', value: websocket.player.maxExperiencePoints }
-                ]), websocket);
-
-                // notify the rest of the room of the new player
-                const message = [
-                    { type: 'Uint32', value: websocket.player.id },
-                    { type: 'Float32', value: websocket.player.x },
-                    { type: 'Float32', value: websocket.player.z },
-                    { type: 'Float32', value: websocket.player.angle },
-                    { type: 'Int8', value: 1 }, // player type and not an NPC type
-                    { type: 'Uint32', value: websocket.player.stats.maxHealth },
-                    { type: 'Uint8', value: websocket.player.class.number },
-                    { type: 'Uint8', value: websocket.player.binaryName.length }
-                ];
-                for (let i = 0; i < websocket.player.binaryName.length; i++) {
-                    message.push({ type: 'Uint8', value: websocket.player.binaryName[i] });
-                }
-                broadcast(createBinaryFrame(4, message), websocket);
-            }
-
-            // a player has requested map data such as players
-            if (data.type === 'request_map_data') {
-                // send list of players and NPCs
-                game.characters.forEach(character => {
-                    const message = [
-                        { type: 'Uint32', value: character.id },
-                        { type: 'Float32', value: character.x },
-                        { type: 'Float32', value: character.z },
-                        { type: 'Float32', value: character.angle },
-                        { type: 'Int8', value: character.isHumanPlayer ? 1 : 0 }, // 1 if is a player and 0 if an NPC
-                        { type: 'Uint32', value: character.stats.maxHealth },
-                        { type: 'Uint8', value: character.isHumanPlayer ? character.class.number : 0 }
-                    ];
-                    if (character.isHumanPlayer) {
-                        message.push({ type: 'Uint8', value: character.binaryName.length });
-                        for (let i = 0; i < character.binaryName.length; i++) {
-                            message.push({ type: 'Uint8', value: character.binaryName[i] });
-                        }
-                    }
-                    transmit(createBinaryFrame(4, message), websocket);
-                });
-            }
-        }
-
-        if (message instanceof ArrayBuffer) {
-            const client_dataview = new DataView(message);
-
-            // player wants to shoot a projectile
-            if (client_dataview.getUint8(0) === 2) {
-                websocket.player.attack(client_dataview.getUint8(1));
-            }
-
-            // player wants to move
-            if (client_dataview.getUint8(0) === 3) {
-                const player = websocket.player;
-                player.move(client_dataview.getUint8(1));
-            }
-        }
-    });
-
-    websocket.on('close', () => {
-        if (game.characters.find(character => character === websocket.player)) {
-            game.characters.splice(game.characters.indexOf(websocket.player), 1);
-            broadcast(createBinaryFrame(6, [{ type: 'Uint32', value: websocket.player.id }]), websocket);
-        }
-    });
-
-    websocket.on('pong', () => websocket.isAlive = true);
-});
 
 class Game {
     constructor() {
@@ -355,6 +256,127 @@ class Game {
         this.usedCharacterIDs = [];
         this.usedCollectibleIDs = [];
 
+        // begin websocket server definition
+
+        this.ws_server = new WebSocket.Server({ server: httpServer });
+
+        this.ws_server.on('connection', websocket => {
+            websocket.isAlive = true; // create this property for the sake of implementing ping-pong heartbeats
+
+            websocket.on('message', message => {
+                if (typeof message === 'string') {
+                    const data = JSON.parse(message);
+
+                    if (data.type === 'join') {
+                        websocket.player = this.createHumanPlayer(data.class);
+                        websocket.player.websocket = websocket; // for removing a player when their Player object is known
+
+                        // send welcome message. the player's id
+                        transmit(createBinaryFrame(3, [
+                            { type: 'Uint32', value: websocket.player.id },
+                            { type: 'Float32', value: websocket.player.maxExperiencePoints }
+                        ]), websocket);
+
+                        // notify the rest of the room of the new player
+                        const message = [
+                            { type: 'Uint32', value: websocket.player.id },
+                            { type: 'Float32', value: websocket.player.x },
+                            { type: 'Float32', value: websocket.player.z },
+                            { type: 'Float32', value: websocket.player.angle },
+                            { type: 'Int8', value: 1 }, // player type and not an NPC type
+                            { type: 'Uint32', value: websocket.player.stats.maxHealth },
+                            { type: 'Uint8', value: websocket.player.class.number },
+                            { type: 'Uint8', value: websocket.player.binaryName.length }
+                        ];
+                        for (let i = 0; i < websocket.player.binaryName.length; i++) {
+                            message.push({ type: 'Uint8', value: websocket.player.binaryName[i] });
+                        }
+                        this.broadcast(createBinaryFrame(4, message), websocket);
+                    }
+
+                    // a player has requested map data such as players
+                    if (data.type === 'request_map_data') {
+                        // send list of players and NPCs
+                        this.characters.forEach(character => {
+                            const message = [
+                                { type: 'Uint32', value: character.id },
+                                { type: 'Float32', value: character.x },
+                                { type: 'Float32', value: character.z },
+                                { type: 'Float32', value: character.angle },
+                                { type: 'Int8', value: character.isHumanPlayer ? 1 : 0 }, // 1 if is a player and 0 if an NPC
+                                { type: 'Uint32', value: character.stats.maxHealth },
+                                { type: 'Uint8', value: character.isHumanPlayer ? character.class.number : 0 }
+                            ];
+                            if (character.isHumanPlayer) {
+                                message.push({ type: 'Uint8', value: character.binaryName.length });
+                                for (let i = 0; i < character.binaryName.length; i++) {
+                                    message.push({ type: 'Uint8', value: character.binaryName[i] });
+                                }
+                            }
+                            transmit(createBinaryFrame(4, message), websocket);
+                        });
+                    }
+                }
+
+                if (message instanceof ArrayBuffer) {
+                    const client_dataview = new DataView(message);
+
+                    // player wants to shoot a projectile
+                    if (client_dataview.getUint8(0) === 2) {
+                        websocket.player.attack(client_dataview.getUint8(1));
+                    }
+
+                    // player wants to move
+                    if (client_dataview.getUint8(0) === 3) {
+                        const player = websocket.player;
+                        player.move(client_dataview.getUint8(1));
+                    }
+                }
+            });
+
+            websocket.on('close', () => {
+                if (this.characters.find(character => character === websocket.player)) {
+                    this.characters.splice(this.characters.indexOf(websocket.player), 1);
+                    this.broadcast(createBinaryFrame(6, [{ type: 'Uint32', value: websocket.player.id }]), websocket);
+                }
+            });
+
+            websocket.on('pong', () => websocket.isAlive = true);
+        });
+
+        // end of websocket server definition
+
+        // ping-pong heartbeat
+        setInterval(() => {
+            this.ws_server.clients.forEach(websocket => {
+                if (websocket.isAlive === false) {
+                    return websocket.terminate();
+                }
+
+                websocket.isAlive = false;
+                if (websocket.readyState === WebSocket.OPEN) {
+                    websocket.ping();
+                }
+            });
+        }, config.pingTime);
+
+        // intervals
+
+        setInterval(() => {
+            this.physicsLoop();
+        }, config.physicsTickRate);
+
+        setInterval(() => {
+            this.gameLogicLoop();
+        }, config.physicsTickRate);
+
+        setInterval(() => {
+            this.sendNetworkUpdates();
+        }, config.networkUpdatePulseRate);
+
+        // end intervals
+
+        // create NPCs
         for (let i = 0; i < 3; i++) {
             this.createNPC();
         }
@@ -508,7 +530,7 @@ class Game {
             orientations.push({ type: 'Float32', value: character.z });
             orientations.push({ type: 'Float32', value: character.angle });
         });
-        broadcast(createBinaryFrame(1, orientations));
+        this.broadcast(createBinaryFrame(1, orientations));
 
         // send character healths
         const healths = [];
@@ -517,18 +539,18 @@ class Game {
             healths.push({ type: 'Uint32', value: character.id });
             healths.push({ type: 'Int32', value: character.health });
         });
-        broadcast(createBinaryFrame(9, healths));
+        this.broadcast(createBinaryFrame(9, healths));
 
         // delayed broadcasts
         this.delayedBroadcasts.forEach(delayedMessage => {
             this.delayedBroadcasts.splice(this.delayedBroadcasts.indexOf(delayedMessage), 1);
-            broadcast(delayedMessage.data, delayedMessage.exception);
+            this.broadcast(delayedMessage.data, delayedMessage.exception);
         });
 
         // delayed transmitPlayers
         this.delayedTransmitPlayers.forEach(delayedMessage => {
             this.delayedTransmitPlayers.splice(this.delayedTransmitPlayers.indexOf(delayedMessage), 1);
-            transmitPlayer(delayedMessage.data, delayedMessage.player);
+            transmit(delayedMessage.data, delayedMessage.player.websocket);
         });
     }
 
@@ -538,6 +560,13 @@ class Game {
 
     addDelayedTransmitPlayer(data, player) {
         this.delayedTransmitPlayers.push({ data: data, player: player });
+    }
+
+    broadcast(data, exception = null) {
+        this.ws_server.clients.forEach(client => {
+            if (client !== exception && client.readyState === WebSocket.OPEN)
+                client.send(data);
+        });
     }
 }
 
@@ -556,8 +585,8 @@ class Character {
         this.collisionBoxSize = config.character.collisionBoxSize;
 
         // initial orientation
-        this.x = Math.random() * (game.mapSize - this.collisionBoxSize);
-        this.z = Math.random() * (game.mapSize - this.collisionBoxSize);
+        this.x = Math.random() * (this.game.mapSize - this.collisionBoxSize);
+        this.z = Math.random() * (this.game.mapSize - this.collisionBoxSize);
         this.angle = CONSTANTS.DIRECTIONS.DOWN; // facing south. it doesn't have to be zero
 
         // movement
@@ -643,8 +672,8 @@ class Character {
         this.health = this.stats.maxHealth;
         this.isAlive = true;
         this.combat = {};
-        this.x = Math.random() * (game.mapSize - this.collisionBoxSize);
-        this.z = Math.random() * (game.mapSize - this.collisionBoxSize);
+        this.x = Math.random() * (this.game.mapSize - this.collisionBoxSize);
+        this.z = Math.random() * (this.game.mapSize - this.collisionBoxSize);
         this.damageTable = [];
     }
 
@@ -840,27 +869,3 @@ function pointInCircleCollision(point, circle, circleRadius) {
 }
 
 const game = new Game();
-
-setInterval(function () {
-    game.physicsLoop();
-}, config.physicsTickRate);
-setInterval(function () {
-    game.gameLogicLoop();
-}, config.physicsTickRate);
-setInterval(function () {
-    game.sendNetworkUpdates();
-}, config.networkUpdatePulseRate);
-
-// ping-pong heartbeat
-setInterval(function () {
-    ws_server.clients.forEach(websocket => {
-        if (websocket.isAlive === false) {
-            return websocket.terminate();
-        }
-
-        websocket.isAlive = false;
-        if (websocket.readyState === WebSocket.OPEN) {
-            websocket.ping();
-        }
-    });
-}, config.pingTime);
