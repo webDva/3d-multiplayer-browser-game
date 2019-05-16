@@ -404,7 +404,7 @@ class Game {
                     levelUpText.textPlane.animations = [levelUpTextAnimation];
                     this.scene.beginAnimation(levelUpText.textPlane, 0, 20, false, 1, () => {
                         levelUpText.dispose();
-                    });                    
+                    });
 
                     const xpText = new OnscreenText(`${xpGain} XP`, position.x, position.y, position.z, 20, 'Arial', 'blue', 1.5, this.scene);
                     const xpAnimationText = new BABYLON.Animation('', 'position.y', 10, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_RELATIVE);
@@ -412,7 +412,7 @@ class Game {
                     xpText.textPlane.animations = [xpAnimationText];
                     this.scene.beginAnimation(xpText.textPlane, 0, 20, false, 1, () => {
                         xpText.dispose();
-                    });                    
+                    });
                 }
             }
         }
@@ -611,7 +611,7 @@ class Game {
                 // projectile-player collisions
                 this.projectiles.forEach(projectile => {
                     this.characters.forEach(character => {
-                        if (projectile.owner !== character.id && AABBCollision(projectile, character)) {
+                        if (projectile.owner !== character.id && util.AABBCollision(projectile, character)) {
                             projectile.particleSystem.stop();
                             this.projectiles.splice(this.projectiles.indexOf(projectile), 1);
                         }
@@ -637,11 +637,7 @@ class Game {
         setInterval(() => {
             // player wants to attack
             if (this.keyboardMap['W'.charCodeAt()]) {
-                const arraybuffer = new ArrayBuffer(2);
-                const dataview = new DataView(arraybuffer);
-                dataview.setUint8(0, 2);
-                dataview.setUint8(1, 1);
-                this.websocket.send(dataview);
+                this.websocket.send(util.createBinaryFrame(2, [{ type: 'Uint8', value: 1 }]));
             }
 
             // arrow keys movement
@@ -659,11 +655,7 @@ class Game {
 
             // send player movement requests
             if (this.player.movement) {
-                const arraybuffer = new ArrayBuffer(2);
-                const dataview = new DataView(arraybuffer);
-                dataview.setUint8(0, 3);
-                dataview.setUint8(1, this.player.movement);
-                this.websocket.send(dataview);
+                this.websocket.send(util.createBinaryFrame(3, [{ type: 'Uint8', value: this.player.movement }]));
             }
         }, this.clientNetworkPulseRate);
     }
@@ -736,18 +728,6 @@ function pointInTriangle(p, v1, v2, v3) {
 
 function lerp(start, end, time) {
     return start * (1 - time) + end * time;
-}
-
-/**
- * Axis-aligned bounding boxes collision detection between two objects with an optional extension prediction.
- * @param {*} a The first object to check for. Must have `.x`, `.z`, and `.collisionBoxSize` members. Can have an extension for collision prediction with the parameter `a_extension`.
- * @param {*} b The second object to check for. Must have `.x`, `.z`, and `.collisionBoxSize` members.
- * @param {*} a_extension Used for predictions. Must have `.x` and `.z` members. If the axis has no extension, then it should be `0`.
- * @return `true` if collison has been detected, `false` otherwise.
- */
-function AABBCollision(a, b, a_extension = { x: 0, z: 0 }) {
-    return (a.x - (a.collisionBoxSize / 2) + a_extension.x <= b.x + (b.collisionBoxSize / 2) && a.x + (a.collisionBoxSize / 2) + a_extension.x >= b.x - (b.collisionBoxSize / 2)) &&
-        (a.z - (a.collisionBoxSize / 2) + a_extension.z <= b.z + (b.collisionBoxSize / 2) && a.z + (a.collisionBoxSize / 2) + a_extension.z >= b.z - (b.collisionBoxSize / 2));
 }
 
 class OnscreenText {
