@@ -9,7 +9,7 @@
     },
     "dependencies": {
         "@node-minify/clean-css": "^4.0.5",
-        "@node-minify/core": "^4.0.5",
+        "@node-minify/core": "^8.0.5",
         "@node-minify/google-closure-compiler": "^4.0.5",
         "@node-minify/html-minifier": "^4.0.5",
         "express": "^4.16.4",
